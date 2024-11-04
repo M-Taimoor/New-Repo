@@ -1,100 +1,128 @@
-import random
-import logging
-from typing import Optional
+import sqlite3
 
-# Configure logging for production
-logging.basicConfig(filename='model_deployment.log', level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+# Database setup
+conn = sqlite3.connect('streaming_service.db')
+cursor = conn.cursor()
 
-# Thresholds for model deployment
-THRESHOLDS = {
-    'accuracy': 85,
-    'cost_limit': 50,
-    'latency_limit': 0.5,
-    'user_satisfaction': 80
-}
+# Create tables
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS plans (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    cost_per_hour REAL NOT NULL
+)
+''')
 
-class ModelDeploymentException(Exception):
-    """Custom exception for model deployment errors."""
-    pass
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE,
+    plan_id INTEGER,
+    hours_streamed REAL NOT NULL DEFAULT 0,
+    total_cost REAL NOT NULL DEFAULT 0.0,
+    FOREIGN KEY (plan_id) REFERENCES plans (id)
+)
+''')
 
-class Model:
-    """A mock Model class to simulate real model metrics."""
-    def __init__(self):
-        self.accuracy = random.randint(70, 100)
-        self.latency = random.uniform(0.1, 1.0)
-        self.user_satisfaction = random.randint(70, 100)
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS billing_history (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    hours_streamed REAL NOT NULL,
+    cost_per_hour REAL NOT NULL,
+    total_cost REAL NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users (id)
+)
+''')
 
-    def get_accuracy(self) -> int:
-        return self.accuracy
+conn.commit()
 
-    def get_latency(self) -> float:
-        return self.latency
+# User Class
+class User:
+    def __init__(self, username, plan_name='standard'):
+        self.username = username
+        self.plan_name = plan_name
+        self.hours_streamed = 0
+        self.total_cost = 0.0
+        self.id = self.get_or_create_user()
 
-    def get_user_satisfaction(self) -> int:
-        return self.user_satisfaction
+    def get_or_create_user(self):
+        """Get the user id from the database or create a new user."""
+        cursor.execute('SELECT id FROM users WHERE username = ?', (self.username,))
+        user = cursor.fetchone()
+        if user:
+            return user[0]
+        cursor.execute('SELECT id FROM plans WHERE name = ?', (self.plan_name,))
+        plan = cursor.fetchone()
+        if plan:
+            plan_id = plan[0]
+        else:
+            cursor.execute('INSERT INTO plans (name, cost_per_hour) VALUES (?, ?)', (self.plan_name, base_cost_per_hour))
+            plan_id = cursor.lastrowid
+            conn.commit()
+        cursor.execute('INSERT INTO users (username, plan_id) VALUES (?, ?)', (self.username, plan_id))
+        conn.commit()
+        return cursor.lastrowid
 
-def estimate_deployment_cost() -> float:
-    """Mock function to estimate deployment cost."""
-    return random.uniform(10, 100)
+    def add_usage(self, hours):
+        """Track user's streaming hours."""
+        self.hours_streamed += hours
+        self.save_usage()
 
-def check_accuracy(model: Model) -> bool:
-    """Check if model accuracy meets the minimum threshold."""
-    return model.get_accuracy() >= THRESHOLDS['accuracy']
+    def calculate_bill(self):
+        """Calculate the total cost based on usage."""
+        cursor.execute('SELECT cost_per_hour FROM plans WHERE id = ?', (self.get_plan_id(),))
+        cost_per_hour = cursor.fetchone()[0]
+        self.total_cost = self.hours_streamed * cost_per_hour
+        self.check_and_apply_extra_discount()
+        return self.total_cost
 
-def check_latency(model: Model) -> bool:
-    """Check if model latency is below the set limit."""
-    return model.get_latency() < THRESHOLDS['latency_limit']
+    def get_plan_id(self):
+        """Get the plan id for the user."""
+        cursor.execute('SELECT plan_id FROM users WHERE id = ?', (self.id,))
+        return cursor.fetchone()[0]
 
-def check_user_satisfaction(model: Model) -> bool:
-    """Check if user satisfaction exceeds the threshold."""
-    return model.get_user_satisfaction() > THRESHOLDS['user_satisfaction']
+    def save_usage(self):
+        """Save the user's usage to the billing history."""
+        cost_per_hour = self.calculate_bill() / self.hours_streamed
+        cursor.execute('''
+        INSERT INTO billing_history (user_id, hours_streamed, cost_per_hour, total_cost)
+        VALUES (?, ?, ?, ?)
+        ''', (self.id, self.hours_streamed, cost_per_hour, self.total_cost))
+        conn.commit()
 
-def can_deploy(model: Optional[Model]) -> bool:
-    """Aggregate all checks to determine if the model should be deployed."""
-    try:
-        if model is None:
-            raise ModelDeploymentException("No model provided for deployment checks.")
-        
-        if not check_accuracy(model):
-            logger.info('Model accuracy does not meet the minimum threshold.')
-            return False
-        
-        cost = estimate_deployment_cost()
-        if cost > THRESHOLDS['cost_limit']:
-            logger.info('Deployment cost exceeds the reasonable limit.')
-            return False
-        
-        if not check_latency(model):
-            logger.info('Model latency is above the acceptable limit.')
-            return False
-        
-        if not check_user_satisfaction(model):
-            logger.info('User satisfaction does not meet the required threshold.')
-            return False
-        
-        logger.info('Model meets all criteria for deployment.')
-        return True
-    except ModelDeploymentException as e:
-        logger.exception(f'Model deployment check failed: {e}')
-        return False
-    except Exception as e:
-        logger.exception(f'An unexpected error occurred during model deployment checks: {e}')
-        return False
+    def generate_invoice(self):
+        """Generate and display the user’s invoice."""
+        print(f"Invoice for {self.username}")
+        cursor.execute('SELECT name, cost_per_hour FROM plans WHERE id = ?', (self.get_plan_id(),))
+        plan_name, cost_per_hour = cursor.fetchone()
+        print(f"Plan: {plan_name}")
+        print(f"Total Hours Streamed: {self.hours_streamed} hours")
+        print(f"Cost per Hour: ${cost_per_hour}")
+        print(f"Total Amount Due: ${self.total_cost}\n")
 
-# Example usage
-if __name__ == '__main__':
-    try:
-        # Create an instance of the Model class
-        model_instance = Model()
+    def check_and_apply_extra_discount(self):
+        """Check if the user is among the top 5 highest-billing users and apply extra discount and 1-week free subscription."""
+        cursor.execute('''
+        SELECT username FROM users ORDER BY total_cost DESC LIMIT 5
+        ''')
+        top_billing_users = cursor.fetchall()
+        if (self.username,) in top_billing_users:
+            # Apply extra discount and 1-week free subscription
+            print(f"User {self.username} has been awarded an extra discount and 1-week free subscription for being among the top 5 highest-billing users!")
 
-        # Run deployment checks
-        deployment_decision = can_deploy(model_instance)
+# Example Usage
+if __name__ == "__main__":
+    # Create a new user and track usage
+    user = User("john_doe", plan_name='premium')
+    
+    # Simulating usage data
+    user.add_usage(5)
+    user.add_usage(3)
 
-        # Log the results
-        print(f'Model Accuracy: {model_instance.get_accuracy()}%')
-        print(f'Model Latency: {model_instance.get_latency():.2f} seconds')
-        print(f'Model User Satisfaction: {model_instance.get_user_satisfaction()}%')
-        print(f'Deployment Decision: {"Approved" if deployment_decision else "Rejected"}')
-    except ModelDeploymentException as e:
-        print(f'Error during model deployment: {e}')
+    # Calculate bill and generate invoice
+    user.generate_invoice()
+
+# Close the database connection
+conn.close()

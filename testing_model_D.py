@@ -1,83 +1,138 @@
-import random
-import logging
-from typing import Optional
+import sqlite3
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Database setup
+conn = sqlite3.connect('streaming_service.db')
+cursor = conn.cursor()
 
-# Thresholds for model deployment
-thresholds = {
-    'accuracy': 85,
-    'cost_limit': 50,
-    'latency_limit': 0.5,
-    'user_satisfaction': 80
-}
+# Create tables
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE,
+    user_type TEXT NOT NULL,
+    plan_id INTEGER NOT NULL,
+    FOREIGN KEY (plan_id) REFERENCES plans (id)
+)
+''')
 
-class ModelDeploymentException(Exception):
-    """Custom exception for model deployment validation."""
-    pass
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS plans (
+    id INTEGER PRIMARY KEY,
+    plan_name TEXT NOT NULL,
+    cost_per_hour REAL NOT NULL
+)
+''')
 
-class Model:
-    """A mock Model class to simulate real model metrics."""
-    def __init__(self):
-        self.accuracy = random.randint(70, 100)
-        self.latency = random.uniform(0.1, 1.0)
-        self.user_satisfaction = random.randint(70, 100)
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS billing_history (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    hours_streamed REAL NOT NULL,
+    total_cost REAL NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users (id)
+)
+''')
 
-    def get_accuracy(self) -> int:
-        return self.accuracy
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS discounts (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    discount_amount REAL NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users (id)
+)
+''')
 
-    def get_latency(self) -> float:
-        return self.latency
+conn.commit()
 
-    def get_user_satisfaction(self) -> int:
-        return self.user_satisfaction
+# Insert plans into the plans table
+plans = [
+    (1, 'standard', 0.5),
+    (2, 'premium', 0.4)  # Premium users have a lower cost per hour
+]
+cursor.executemany('INSERT OR IGNORE INTO plans (id, plan_name, cost_per_hour) VALUES (?, ?, ?)', plans)
+conn.commit()
 
-def estimate_deployment_cost() -> float:
-    """Mock function to estimate deployment cost."""
-    return random.uniform(10, 100)
+# User Class
+class User:
+    def __init__(self, username, user_type='regular', plan_id=1):
+        self.username = username
+        self.user_type = user_type
+        self.plan_id = plan_id
+        self.hours_streamed = 0
+        self.total_cost = 0.0
+        self.id = self.get_or_create_user()
 
-def check_accuracy(model: Model) -> bool:
-    """Check if model accuracy meets the minimum threshold."""
-    return model.get_accuracy() >= thresholds['accuracy']
+    def get_or_create_user(self):
+        """Get the user id from the database or create a new user."""
+        cursor.execute('SELECT id FROM users WHERE username = ?', (self.username,))
+        user = cursor.fetchone()
+        if user:
+            return user[0]
+        cursor.execute('INSERT INTO users (username, user_type, plan_id) VALUES (?, ?, ?)', (self.username, self.user_type, self.plan_id))
+        conn.commit()
+        return cursor.lastrowid
 
-def check_latency(model: Model) -> bool:
-    """Check if model latency is below the set limit."""
-    return model.get_latency() < thresholds['latency_limit']
+    def add_usage(self, hours, is_peak_time=False):
+        """Track user's streaming hours."""
+        self.hours_streamed += hours
+        self.calculate_bill(is_peak_time)
 
-def check_user_satisfaction(model: Model) -> bool:
-    """Check if user satisfaction exceeds the threshold."""
-    return model.get_user_satisfaction() > thresholds['user_satisfaction']
+    def calculate_bill(self, is_peak_time):
+        """Calculate the total cost based on usage."""
+        plan_cost = self.get_plan_cost()
+        self.total_cost = self.hours_streamed * plan_cost
+        if is_peak_time:
+            self.total_cost *= 1.2  # 20% increase during peak times
+        if self.user_type == 'premium':
+            self.apply_discount()
 
-def can_deploy(model: Model) -> bool:
-    """Aggregate all checks to determine if the model should be deployed."""
-    try:
-        if not check_accuracy(model):
-            raise ModelDeploymentException('Model accuracy does not meet the minimum threshold.')
-        if estimate_deployment_cost() > thresholds['cost_limit']:
-            raise ModelDeploymentException('Deployment cost exceeds the reasonable limit.')
-        if not check_latency(model):
-            raise ModelDeploymentException('Model latency is above the acceptable limit.')
-        if not check_user_satisfaction(model):
-            raise ModelDeploymentException('User satisfaction does not meet the required threshold.')
-        logging.info('Model meets all criteria for deployment.')
-        return True
-    except ModelDeploymentException as e:
-        logging.error(e)
-        return False
-    except KeyError as e:
-        logging.error(f'Missing configuration for {e}')
-        raise
-    except Exception as e:
-        logging.error(f'An unexpected error occurred: {e}')
-        raise
+    def get_plan_cost(self):
+        """Get the cost per hour for the user's plan."""
+        cursor.execute('SELECT cost_per_hour FROM plans WHERE id = ?', (self.plan_id,))
+        plan = cursor.fetchone()
+        return plan[0] if plan else base_cost_per_hour
 
-# Create an instance of the Model class
-model_instance = Model()
+    def apply_discount(self):
+        """Apply a promotional discount to the user."""
+        cursor.execute('SELECT cost_per_hour FROM plans WHERE id = ?', (self.plan_id,))
+        plan = cursor.fetchone()
+        if plan:
+            self.total_cost *= 0.9  # 10% discount for premium users
 
-# Test deployment decision
-deployment_decision = can_deploy(model_instance)
-print(f'Model Accuracy: {model_instance.get_accuracy()}%')
-print(f'Model Latency: {model_instance.get_latency():.2f} seconds')
-print(f'Model User Satisfaction: {model_instance.get_user_satisfaction()}%')
-print(f'Deployment Decision: {"Approved" if deployment_decision else "Rejected"}')
+    def save_usage(self):
+        """Save the user's usage to the billing history."""
+        cursor.execute('''
+        INSERT INTO billing_history (user_id, hours_streamed, total_cost)
+        VALUES (?, ?, ?)
+        ''', (self.id, self.hours_streamed, self.total_cost))
+        conn.commit()
+
+    def generate_invoice(self):
+        """Generate and display the user’s invoice."""
+        print(f"Invoice for {self.username}")
+        print(f"User Type: {self.user_type}")
+        print(f"Plan: {self.get_plan_name()}")
+        print(f"Total Hours Streamed: {self.hours_streamed} hours")
+        print(f"Total Amount Due: ${self.total_cost}\n")
+
+    def get_plan_name(self):
+        """Get the name of the user's plan."""
+        cursor.execute('SELECT plan_name FROM plans WHERE id = ?', (self.plan_id,))
+        plan = cursor.fetchone()
+        return plan[0] if plan else 'Unknown'
+
+# Example Usage
+if __name__ == "__main__":
+    # Create a new user and track usage
+    user = User("john_doe", user_type='premium')
+    
+    # Simulating usage data
+    user.add_usage(5, is_peak_time=True)
+    user.add_usage(3)
+
+    # Calculate bill and generate invoice
+    user.generate_invoice()
+
+    # Close the database connection
+    conn.close()
