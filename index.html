@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="{{ get_locale() }}">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ _("E-commerce Platform") }}</title>
+</head>
+<body>
+    <h1>{{ product_name }}</h1>
+    <p>{{ _("Price") }}: {{ format_currency(price) }}</p>
+    <p>{{ _("Today's Date") }}: {{ format_date(today) }}</p>
+    
+    <h2>{{ _("Choose Language") }}</h2>
+    <a href="{{ url_for('set_language', lang='en') }}">English</a> |
+    <a href="{{ url_for('set_language', lang='es') }}">Español</a>
+</body>
+</html>

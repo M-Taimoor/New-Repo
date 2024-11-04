@@ -1,0 +1,4 @@
+2024-10-22 06:43:17,800 - ERROR - Failed to connect to ny1.example.com due to: [Errno 11001] getaddrinfo failed
+2024-10-22 06:43:17,801 - ERROR - Could not connect to the server for new_york_office
+2024-10-22 06:43:18,057 - ERROR - Failed to connect to ld1.example.com due to: [Errno 11001] getaddrinfo failed
+2024-10-22 06:43:18,057 - ERROR - Could not connect to the server for london_office

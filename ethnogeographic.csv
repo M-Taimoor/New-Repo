@@ -1,0 +1,6 @@
+region,population_density,typical_genetic_markers
+Asia,500,"Marker_ABC,Marker_DEF"
+Europe,300,"Marker_XYZ,Marker_GHI"
+Africa,400,"Marker_KLM,Marker_NOP"
+North America,200,"Marker_QRS,Marker_TUV"
+South America,150,"Marker_WXY,Marker_ZAB"

@@ -1,0 +1,11 @@
+msgid "Product Name"
+msgstr "Nombre del Producto"
+
+msgid "Price"
+msgstr "Precio"
+
+msgid "Today's Date"
+msgstr "Fecha de Hoy"
+
+msgid "Choose Language"
+msgstr "Elija Idioma"

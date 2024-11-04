@@ -1,0 +1,4 @@
+2024-10-21 14:28:27,413 - INFO - Updated VPN policies for office1: {'access_rights': 'admin', 'security_settings': 'default'}
+2024-10-21 14:28:27,414 - INFO - Enforcing VPN policies for office1: {'access_rights': 'admin', 'security_settings': 'default'}
+2024-10-21 14:28:27,415 - INFO - Enforcing VPN policies for office2: {'access_rights': 'limited', 'security_settings': 'high'}
+2024-10-21 14:28:27,416 - INFO - Enforcing VPN policies for office3: {'access_rights': 'admin', 'security_settings': 'default'}

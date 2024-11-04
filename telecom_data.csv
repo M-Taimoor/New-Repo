@@ -1,0 +1,6 @@
+Customer_ID,Call_Duration,Messages_Sent,Data_Usage,Location,Plan_Type
+101,120,20,1.5,City A,Premium
+102,340,15,2.3,City B,Standard
+103,90,30,1.1,City A,Premium
+104,250,25,3.5,City C,Standard
+105,180,40,2.0,City B,Premium

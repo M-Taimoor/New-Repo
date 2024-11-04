@@ -1,0 +1,5 @@
+{
+    "old_setting": "value_from_old_config",
+    "another_old_setting": 42,
+    "extra_setting": "legacy_data"
+}
