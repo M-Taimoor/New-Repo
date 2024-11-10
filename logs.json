@@ -1,0 +1,42 @@
+[
+    {
+        "Message": "User logged in successfully",
+        "Source": "AuthModule"
+    },
+    {
+        "Message": "Failed login attempt",
+        "Source": "AuthModule"
+    },
+    {
+        "Message": "Error connecting to database",
+        "Source": "DatabaseModule"
+    },
+    {
+        "Message": "File not found error",
+        "Source": "FileSystemModule"
+    },
+    {
+        "Message": "User updated profile",
+        "Source": "UserModule"
+    },
+    {
+        "Message": "Permission denied for user",
+        "Source": "AuthModule"
+    },
+    {
+        "Message": "File uploaded successfully",
+        "Source": "FileSystemModule"
+    },
+    {
+        "Message": "Server started",
+        "Source": "ServerModule"
+    },
+    {
+        "Message": "Database connection established",
+        "Source": "DatabaseModule"
+    },
+    {
+        "Message": "User logged out",
+        "Source": "AuthModule"
+    }
+]

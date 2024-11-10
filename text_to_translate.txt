@@ -1,0 +1,5 @@
+Ideal Response:
+Make sure your ideal response code has exception handling included wherever necessary based on use case/prompt. In general, we have to assume that these codes are meant for the productionized environment where error handling is critical requirements.
+Do not use model responses as ideal responses; build your own ideal responses. However, you may take inspiration and ideas to create your own Ideal Response.
+The Ideal Response should address all the issues identified in the Model Evaluation Form.
+The Ideal Response should meet all the prompt requirements.

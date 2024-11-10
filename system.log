@@ -1,0 +1,10 @@
+INFO - User logged in successfully
+ERROR - Failed login attempt
+WARNING - Disk usage at 90%
+INFO - Database connection established
+ERROR - Error connecting to database
+INFO - User logged out
+ERROR - File not found error
+INFO - File uploaded successfully
+ERROR - Permission denied for user
+INFO - Server started

@@ -1,0 +1,3 @@
+Group,Average Score with Haptics,Average Score without Haptics,T-Test p-value
+Highly Engaged,87.13564856503477,67.89223631221296,2.722490596000501e-10
+Low Engaged,61.45710736727613,66.95646625346622,0.02909501213876739
