@@ -1,128 +1,37 @@
-import sqlite3
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
 
-# Database setup
-conn = sqlite3.connect('streaming_service.db')
-cursor = conn.cursor()
+# Load and preprocess the transaction data
+data = pd.read_csv('transaction_data.csv')
+# Feature engineering, data preprocessing, etc.
 
-# Create tables
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS plans (
-    id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL,
-    cost_per_hour REAL NOT NULL
-)
-''')
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY,
-    username TEXT NOT NULL UNIQUE,
-    plan_id INTEGER,
-    hours_streamed REAL NOT NULL DEFAULT 0,
-    total_cost REAL NOT NULL DEFAULT 0.0,
-    FOREIGN KEY (plan_id) REFERENCES plans (id)
-)
-''')
+# Train the fraud detection model
+model = RandomForestClassifier()
+model.fit(X_train, y_train)
 
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS billing_history (
-    id INTEGER PRIMARY KEY,
-    user_id INTEGER NOT NULL,
-    date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    hours_streamed REAL NOT NULL,
-    cost_per_hour REAL NOT NULL,
-    total_cost REAL NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES users (id)
-)
-''')
+# Evaluate the model
+predictions = model.predict(X_test)
+print(classification_report(y_test, predictions))
 
-conn.commit()
-
-# User Class
-class User:
-    def __init__(self, username, plan_name='standard'):
-        self.username = username
-        self.plan_name = plan_name
-        self.hours_streamed = 0
-        self.total_cost = 0.0
-        self.id = self.get_or_create_user()
-
-    def get_or_create_user(self):
-        """Get the user id from the database or create a new user."""
-        cursor.execute('SELECT id FROM users WHERE username = ?', (self.username,))
-        user = cursor.fetchone()
-        if user:
-            return user[0]
-        cursor.execute('SELECT id FROM plans WHERE name = ?', (self.plan_name,))
-        plan = cursor.fetchone()
-        if plan:
-            plan_id = plan[0]
-        else:
-            cursor.execute('INSERT INTO plans (name, cost_per_hour) VALUES (?, ?)', (self.plan_name, base_cost_per_hour))
-            plan_id = cursor.lastrowid
-            conn.commit()
-        cursor.execute('INSERT INTO users (username, plan_id) VALUES (?, ?)', (self.username, plan_id))
-        conn.commit()
-        return cursor.lastrowid
-
-    def add_usage(self, hours):
-        """Track user's streaming hours."""
-        self.hours_streamed += hours
-        self.save_usage()
-
-    def calculate_bill(self):
-        """Calculate the total cost based on usage."""
-        cursor.execute('SELECT cost_per_hour FROM plans WHERE id = ?', (self.get_plan_id(),))
-        cost_per_hour = cursor.fetchone()[0]
-        self.total_cost = self.hours_streamed * cost_per_hour
-        self.check_and_apply_extra_discount()
-        return self.total_cost
-
-    def get_plan_id(self):
-        """Get the plan id for the user."""
-        cursor.execute('SELECT plan_id FROM users WHERE id = ?', (self.id,))
-        return cursor.fetchone()[0]
-
-    def save_usage(self):
-        """Save the user's usage to the billing history."""
-        cost_per_hour = self.calculate_bill() / self.hours_streamed
-        cursor.execute('''
-        INSERT INTO billing_history (user_id, hours_streamed, cost_per_hour, total_cost)
-        VALUES (?, ?, ?, ?)
-        ''', (self.id, self.hours_streamed, cost_per_hour, self.total_cost))
-        conn.commit()
-
-    def generate_invoice(self):
-        """Generate and display the user’s invoice."""
-        print(f"Invoice for {self.username}")
-        cursor.execute('SELECT name, cost_per_hour FROM plans WHERE id = ?', (self.get_plan_id(),))
-        plan_name, cost_per_hour = cursor.fetchone()
-        print(f"Plan: {plan_name}")
-        print(f"Total Hours Streamed: {self.hours_streamed} hours")
-        print(f"Cost per Hour: ${cost_per_hour}")
-        print(f"Total Amount Due: ${self.total_cost}\n")
-
-    def check_and_apply_extra_discount(self):
-        """Check if the user is among the top 5 highest-billing users and apply extra discount and 1-week free subscription."""
-        cursor.execute('''
-        SELECT username FROM users ORDER BY total_cost DESC LIMIT 5
-        ''')
-        top_billing_users = cursor.fetchall()
-        if (self.username,) in top_billing_users:
-            # Apply extra discount and 1-week free subscription
-            print(f"User {self.username} has been awarded an extra discount and 1-week free subscription for being among the top 5 highest-billing users!")
-
-# Example Usage
-if __name__ == "__main__":
-    # Create a new user and track usage
-    user = User("john_doe", plan_name='premium')
+# Function to predict and respond to potential fraud cases
+def detect_fraud(transaction):
+    # Predict if the transaction is fraudulent
+    fraud_probability = model.predict_proba(transaction)[0][1]
     
-    # Simulating usage data
-    user.add_usage(5)
-    user.add_usage(3)
+    # Trigger an alert if fraud probability is high
+    if fraud_probability > threshold:
+        trigger_alert(transaction)
+        pause_transaction(transaction)
+        notify_customer(transaction)
+        escalate_to_fraud_team(transaction)
 
-    # Calculate bill and generate invoice
-    user.generate_invoice()
+# Implement the alert trigger, pause, notification, and escalation functions
+# ...
 
-# Close the database connection
-conn.close()
+# Integrate the fraud detection with real-time transaction processing
+# ...
