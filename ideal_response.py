@@ -1,56 +1,68 @@
-import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report
+from datetime import datetime, timedelta
+import uuid
 
-# Load and preprocess the transaction data
-data = pd.read_csv('transaction_data.csv')
+# Define a simple Payment class to store payment details
+class Payment:
+    def __init__(self, amount, recipient, payment_type="adhoc", frequency=None):
+        self.id = uuid.uuid4()
+        self.amount = amount
+        self.recipient = recipient
+        self.payment_type = payment_type  # 'adhoc' or 'recurring'
+        self.frequency = frequency  # e.g., 'monthly' for recurring payments
+        self.created_at = datetime.now()
+        self.next_payment_date = self.schedule_next_payment()
 
-# Convert categorical columns to numeric using one-hot encoding
-X = data.drop(columns=['is_fraud'])  # Assuming 'is_fraud' is the target column
-X = pd.get_dummies(X, drop_first=True)  # Encode categorical variables
-y = data['is_fraud']
+    def schedule_next_payment(self):
+        if self.payment_type == "recurring" and self.frequency:
+            if self.frequency == "monthly":
+                return self.created_at + timedelta(days=30)
+        return self.created_at  # For ad-hoc, next payment is the creation time
 
-# Split the data into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+    def authorize_payment(self):
+        print(f"Authorizing payment ID {self.id} of amount ${self.amount} to {self.recipient}.")
 
-# Train the fraud detection model
-model = RandomForestClassifier()
-model.fit(X_train, y_train)
+    def process_payment(self):
+        print(f"Processing payment ID {self.id} of amount ${self.amount} to {self.recipient} on {datetime.now()}.")
 
-# Evaluate the model
-predictions = model.predict(X_test)
-print(classification_report(y_test, predictions))
+# Define a PaymentSystem class to manage multiple payments
+class PaymentSystem:
+    def __init__(self):
+        self.payments = []
 
-# Define a threshold for fraud probability (you can adjust this as needed)
-threshold = 0.5
+    def add_payment(self, payment):
+        self.payments.append(payment)
+        print(f"Payment to {payment.recipient} added.")
 
-# Function to predict and respond to potential fraud cases
-def detect_fraud(transaction):
-    # Predict if the transaction is fraudulent
-    fraud_probability = model.predict_proba([transaction])[0][1]
-    
-    # Trigger an alert if fraud probability is high
-    if fraud_probability > threshold:
-        trigger_alert(transaction)
-        pause_transaction(transaction)
-        notify_customer(transaction)
-        escalate_to_fraud_team(transaction)
+    def schedule_payments(self):
+        for payment in self.payments:
+            if payment.payment_type == "recurring" and payment.next_payment_date <= datetime.now():
+                payment.authorize_payment()
+                payment.process_payment()
+                payment.next_payment_date = payment.schedule_next_payment()  # Update for next cycle
 
-# Implement the alert trigger, pause, notification, and escalation functions
-def trigger_alert(transaction):
-    print("Alert: Potential fraud detected!")
+    def report_spending(self):
+        print("\nSpending Report:")
+        spending_summary = {}
+        for payment in self.payments:
+            spending_summary[payment.recipient] = spending_summary.get(payment.recipient, 0) + payment.amount
+        for recipient, total in spending_summary.items():
+            print(f"Total paid to {recipient}: ${total}")
 
-def pause_transaction(transaction):
-    print("Transaction paused for review.")
+# Sample Usage
+if __name__ == "__main__":
+    payment_system = PaymentSystem()
 
-def notify_customer(transaction):
-    print("Customer notified about the suspicious transaction.")
+    # Add an ad-hoc payment
+    adhoc_payment = Payment(amount=500, recipient="Service Provider A", payment_type="adhoc")
+    payment_system.add_payment(adhoc_payment)
 
-def escalate_to_fraud_team(transaction):
-    print("Escalated to fraud response team.")
+    # Add a recurring monthly payment
+    recurring_payment = Payment(amount=2000, recipient="Supplier B", payment_type="recurring", frequency="monthly")
+    payment_system.add_payment(recurring_payment)
 
-# Example usage with a single transaction from the test set
-# (Assuming transaction data is structured similarly to your feature set)
-sample_transaction = X_test.iloc[0]
-detect_fraud(sample_transaction)
+    # Simulate scheduling and processing payments
+    print("\nScheduling payments:")
+    payment_system.schedule_payments()
+
+    # Generate spending report
+    payment_system.report_spending()
