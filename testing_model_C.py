@@ -1,72 +1,142 @@
+import sqlite3
+import datetime
 import logging
+from sqlite3 import Error
 
-# Define the Jaro-Winkler distance function
-def jaro_winkler(s1, s2):
-    # ... (Jaro-Winkler function code from previous snippets goes here)
-    # Example implementation (ensure you include the full function code as well)
-    def jaro_distance(s1, s2):
-        # ... (Jaro distance sub-function code)
-        pass
+# Configure logging
+logging.basicConfig(level=logging.ERROR)
 
-    # Step 1: Calculate the Jaro distance using the sub-function
-    jaro_dist = jaro_distance(s1, s2)
-    
-    # Step 2: Apply the Jaro-Winkler adjustment
-    prefix = 0
-    max_prefix_length = 4
-    for i in range(min(len(s1), len(s2))):
-        if s1[i] == s2[i]:
-            prefix += 1
-        else:
-            break
-        if prefix == max_prefix_length:
-            break
-    winkler_adjustment = 0.1 * prefix * (1 - jaro_dist)
+# Database setup with error handling
+def create_connection(db_file):
+    """ create a database connection to the SQLite database specified by db_file """
+    conn = None
+    try:
+        conn = sqlite3.connect(db_file)
+        return conn
+    except Error as e:
+        logging.error(e)
+    return conn
 
-    # Return the Jaro-Winkler distance
-    return jaro_dist + winkler_adjustment
+conn = create_connection('payments.db')
 
-# Function to suggest a similar word from the list
-def suggest_similar_word(input_word, word_list, threshold=0.8):
-    # Filter out suggestions below the threshold
-    suggestions = [(word, jaro_winkler(input_word, word)) for word in word_list]
-    # Sort by similarity score in descending order
-    suggestions.sort(key=lambda x: x[1], reverse=True)
-    # Get the most similar word if it exists above the threshold
-    return suggestions[0][0] if suggestions and suggestions[0][1] >= threshold else None
+# Create tables for vendors and payments with error handling
+def create_table(conn, create_table_sql):
+    try:
+        c = conn.cursor()
+        c.execute(create_table_sql)
+    except Error as e:
+        logging.error(e)
 
-# Function to interact with the user and update the word list if necessary
-def interact_and_update_list(input_word, word_list):
-    # Check if the input word matches any word in the list
-    if input_word in word_list:
-        print(f"The word '{input_word}' is in the list.")
-        return
-    # Suggest a similar word from the list
-    suggested_word = suggest_similar_word(input_word, word_list)
-    if suggested_word:
-        print(f"Did you mean '{suggested_word}'? (yes/no): ", end="")
-        user_response = input().strip().lower()
-        if user_response == 'yes':
-            print(f"Great! Using '{suggested_word}' as the correct word.")
-        else:
-            print("No similar word found.")
-    else:
-        # Ask the user if they want to add the new word to the list
-        print(f"No similar word found. Would you like to add '{input_word}' to the list for future suggestions? (yes/no): ", end="")
-        add_word_response = input().strip().lower()
-        if add_word_response == 'yes':
-            word_list.append(input_word)
-            print(f"Word '{input_word}' added to the list.")
-            # Save the updated list to a file (optional)
-            with open('word_list.txt', 'w') as file:
-                file.writelines(f"{word}\n" for word in word_list)
-            print("The word list has been updated.")
+sql_create_vendors_table = '''
+CREATE TABLE IF NOT EXISTS vendors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    address TEXT NOT NULL
+)
+'''
 
-# Main program loop to interact with the user
-if __name__ == "__main__":
-    word_list = ["apple", "application", "appetizer", "phone", "iphonex", "iphone", "app", "application"]
-    while True:
-        user_input = input("Enter a word (or type 'exit' to quit): ").strip().lower()
-        if user_input == 'exit':
-            break
-        interact_and_update_list(user_input, word_list)
+sql_create_payments_table = '''
+CREATE TABLE IF NOT EXISTS payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    vendor_id INTEGER,
+    amount REAL NOT NULL,
+    description TEXT NOT NULL,
+    payment_type TEXT NOT NULL CHECK(payment_type IN ('ad_hoc', 'recurring')),
+    payment_date TIMESTAMP NOT NULL,
+    FOREIGN KEY (vendor_id) REFERENCES vendors (id)
+)
+'''
+
+if conn is not None:
+    create_table(conn, sql_create_vendors_table)
+    create_table(conn, sql_create_payments_table)
+else:
+    logging.error("Error! cannot create the database connection.")
+
+# Payment processing classes with error handling
+class Payment:
+    def __init__(self, vendor_id, amount, description, payment_type):
+        self.vendor_id = vendor_id
+        self.amount = amount
+        self.description = description
+        self.payment_type = payment_type
+        self.timestamp = datetime.datetime.now().isoformat()
+
+    def process_payment(self):
+        try:
+            # Logic for processing payment
+            print(f"Processing {self.payment_type} payment: {self.description} for amount: ${self.amount}")
+            # Here you would add integration with a payment gateway
+            # Insert payment record into the database
+            with conn:
+                conn.execute('''
+                INSERT INTO payments (vendor_id, amount, description, payment_type, payment_date)
+                VALUES (?, ?, ?, ?, ?)
+                ''', (self.vendor_id, self.amount, self.description, self.payment_type, self.timestamp))
+        except Error as e:
+            logging.error(e)
+        except Exception as e:
+            logging.error(f"An error occurred while processing the payment: {e}")
+
+class AdHocPayment(Payment):
+    pass  # No additional attributes for ad-hoc payments
+
+class RecurringPayment(Payment):
+    def __init__(self, vendor_id, amount, description, payment_type, interval):
+        super().__init__(vendor_id, amount, description, payment_type)
+        self.interval = interval  # Could be 'monthly', 'weekly', etc.
+        self.next_payment_date = self.timestamp + datetime.timedelta(days=self.get_days_until_next_payment())
+
+    def get_days_until_next_payment(self):
+        if self.interval == 'monthly':
+            return 30  # Simplified monthly interval
+        # Add more interval conditions as needed
+        return 30
+
+    def process_payment(self):
+        try:
+            # Logic for processing a recurring payment
+            print(f"Processing recurring payment: {self.description} for amount: ${self.amount}")
+            # Here you would add integration with a payment gateway
+            # Update the next payment date
+            self.timestamp = datetime.datetime.now().isoformat()
+            self.next_payment_date = self.timestamp + datetime.timedelta(days=self.get_days_until_next_payment())
+            # Insert payment record into the database
+            with conn:
+                conn.execute('''
+                INSERT INTO payments (vendor_id, amount, description, payment_type, payment_date)
+                VALUES (?, ?, ?, ?, ?)
+                ''', (self.vendor_id, self.amount, self.description, self.payment_type, self.timestamp))
+        except Error as e:
+            logging.error(e)
+        except Exception as e:
+            logging.error(f"An error occurred while processing the recurring payment: {e}")
+
+# Example usage
+# Assume vendor with id 1 already exists in the database
+vendor_id = 1
+try:
+    adhoc_payment = AdHocPayment(vendor_id, 100, "Ad-Hoc Service Fee", 'ad_hoc')
+    adhoc_payment.process_payment()
+
+    recurring_payment = RecurringPayment(vendor_id, 50, "Monthly Subscription", 'recurring', 'monthly')
+    recurring_payment.process_payment()
+
+    # Function to show all ad-hoc and recurring payments at the end of the day
+    def show_payments():
+        try:
+            with conn:
+                conn.execute('SELECT * FROM payments WHERE payment_type = "ad_hoc" OR payment_type = "recurring"')
+                payments = conn.fetchall()
+                for payment in payments:
+                    print(payment)
+        except Error as e:
+            logging.error(e)
+
+    # At the end of the day, show all payments
+    show_payments()
+finally:
+    # Close the database connection
+    if conn:
+        conn.close()

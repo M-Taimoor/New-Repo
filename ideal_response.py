@@ -1,68 +1,130 @@
-from datetime import datetime, timedelta
-import uuid
+import sqlite3
+import datetime
+import logging
 
-# Define a simple Payment class to store payment details
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Database setup with error handling
+try:
+    conn = sqlite3.connect('payments.db')
+    c = conn.cursor()
+    
+    # Create tables for vendors and payments with error handling
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS vendors (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        address TEXT NOT NULL
+    )
+    ''')
+
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS payments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        vendor_id INTEGER,
+        amount REAL NOT NULL,
+        description TEXT NOT NULL,
+        payment_type TEXT NOT NULL CHECK(payment_type IN ('ad_hoc', 'recurring')),
+        payment_date TEXT NOT NULL,
+        FOREIGN KEY (vendor_id) REFERENCES vendors (id)
+    )
+    ''')
+    conn.commit()
+except sqlite3.Error as e:
+    logging.error(f"Error setting up database: {e}")
+    conn.close()
+    raise SystemExit
+
 class Payment:
-    def __init__(self, amount, recipient, payment_type="adhoc", frequency=None):
-        self.id = uuid.uuid4()
+    def __init__(self, vendor_id, amount, description, payment_type):
+        self.vendor_id = vendor_id
         self.amount = amount
-        self.recipient = recipient
-        self.payment_type = payment_type  # 'adhoc' or 'recurring'
-        self.frequency = frequency  # e.g., 'monthly' for recurring payments
-        self.created_at = datetime.now()
-        self.next_payment_date = self.schedule_next_payment()
-
-    def schedule_next_payment(self):
-        if self.payment_type == "recurring" and self.frequency:
-            if self.frequency == "monthly":
-                return self.created_at + timedelta(days=30)
-        return self.created_at  # For ad-hoc, next payment is the creation time
-
-    def authorize_payment(self):
-        print(f"Authorizing payment ID {self.id} of amount ${self.amount} to {self.recipient}.")
+        self.description = description
+        self.payment_type = payment_type
+        self.timestamp = datetime.datetime.now()  # Store as a datetime object for easy manipulation
 
     def process_payment(self):
-        print(f"Processing payment ID {self.id} of amount ${self.amount} to {self.recipient} on {datetime.now()}.")
+        try:
+            # Logic for processing payment
+            logging.info(f"Processing {self.payment_type} payment: {self.description} for amount: ${self.amount}")
+            # Insert payment record into the database
+            c.execute('''
+            INSERT INTO payments (vendor_id, amount, description, payment_type, payment_date)
+            VALUES (?, ?, ?, ?, ?)
+            ''', (self.vendor_id, self.amount, self.description, self.payment_type, self.timestamp.isoformat()))
+            conn.commit()
+        except sqlite3.Error as e:
+            logging.error(f"Failed to process payment: {e}")
+            conn.rollback()
 
-# Define a PaymentSystem class to manage multiple payments
-class PaymentSystem:
-    def __init__(self):
-        self.payments = []
+class AdHocPayment(Payment):
+    pass  # No additional attributes for ad-hoc payments
 
-    def add_payment(self, payment):
-        self.payments.append(payment)
-        print(f"Payment to {payment.recipient} added.")
+class RecurringPayment(Payment):
+    def __init__(self, vendor_id, amount, description, payment_type, interval):
+        super().__init__(vendor_id, amount, description, payment_type)
+        self.interval = interval  # Could be 'monthly', 'weekly', etc.
+        self.next_payment_date = self.calculate_next_payment_date()
 
-    def schedule_payments(self):
-        for payment in self.payments:
-            if payment.payment_type == "recurring" and payment.next_payment_date <= datetime.now():
-                payment.authorize_payment()
-                payment.process_payment()
-                payment.next_payment_date = payment.schedule_next_payment()  # Update for next cycle
+    def get_days_until_next_payment(self):
+        if self.interval == 'monthly':
+            return 30  # Simplified monthly interval
+        elif self.interval == 'weekly':
+            return 7  # Example interval
+        else:
+            logging.warning(f"Unsupported interval '{self.interval}' specified, defaulting to monthly.")
+            return 30  # Default to 30 days if unsupported interval
 
-    def report_spending(self):
-        print("\nSpending Report:")
-        spending_summary = {}
-        for payment in self.payments:
-            spending_summary[payment.recipient] = spending_summary.get(payment.recipient, 0) + payment.amount
-        for recipient, total in spending_summary.items():
-            print(f"Total paid to {recipient}: ${total}")
+    def calculate_next_payment_date(self):
+        # Calculate the next payment date based on the interval
+        return self.timestamp + datetime.timedelta(days=self.get_days_until_next_payment())
 
-# Sample Usage
-if __name__ == "__main__":
-    payment_system = PaymentSystem()
+    def process_payment(self):
+        try:
+            # Logic for processing a recurring payment
+            logging.info(f"Processing recurring payment: {self.description} for amount: ${self.amount}")
+            # Update the next payment date
+            self.timestamp = datetime.datetime.now()
+            self.next_payment_date = self.calculate_next_payment_date()
+            # Insert payment record into the database
+            c.execute('''
+            INSERT INTO payments (vendor_id, amount, description, payment_type, payment_date)
+            VALUES (?, ?, ?, ?, ?)
+            ''', (self.vendor_id, self.amount, self.description, self.payment_type, self.timestamp.isoformat()))
+            conn.commit()
+        except sqlite3.Error as e:
+            logging.error(f"Failed to process recurring payment: {e}")
+            conn.rollback()
 
-    # Add an ad-hoc payment
-    adhoc_payment = Payment(amount=500, recipient="Service Provider A", payment_type="adhoc")
-    payment_system.add_payment(adhoc_payment)
+# Example usage with error handling
+try:
+    # Assume vendor with id 1 already exists in the database
+    vendor_id = 1
+    adhoc_payment = AdHocPayment(vendor_id, 100, "Ad-Hoc Service Fee", 'ad_hoc')
+    adhoc_payment.process_payment()
 
-    # Add a recurring monthly payment
-    recurring_payment = Payment(amount=2000, recipient="Supplier B", payment_type="recurring", frequency="monthly")
-    payment_system.add_payment(recurring_payment)
+    recurring_payment = RecurringPayment(vendor_id, 50, "Monthly Subscription", 'recurring', 'monthly')
+    recurring_payment.process_payment()
 
-    # Simulate scheduling and processing payments
-    print("\nScheduling payments:")
-    payment_system.schedule_payments()
+    # Function to show all ad-hoc and recurring payments at the end of the day
+    def show_payments():
+        try:
+            c.execute('SELECT * FROM payments WHERE payment_type = "ad_hoc" OR payment_type = "recurring"')
+            payments = c.fetchall()
+            for payment in payments:
+                print(payment)
+        except sqlite3.Error as e:
+            logging.error(f"Error fetching payments: {e}")
 
-    # Generate spending report
-    payment_system.report_spending()
+    # At the end of the day, show all payments
+    show_payments()
+
+except Exception as e:
+    logging.error(f"An error occurred during payment processing: {e}")
+
+finally:
+    # Close the database connection
+    conn.close()
+    logging.info("Database connection closed.")

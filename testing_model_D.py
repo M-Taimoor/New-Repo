@@ -1,112 +1,92 @@
-import logging
+import sqlite3
+import datetime
+import pytz
+from sqlite3 import Error
 
-# Jaro-Winkler distance function
-def jaro_winkler(s1, s2):
-    # Calculate the Jaro distance
-    def jaro_distance(s1, s2):
-        if s1 == s2:
-            return 1.0
+# Function to create a database connection
+def create_connection(db_file):
+    """Create a database connection to the SQLite database specified by db_file"""
+    conn = None
+    try:
+        conn = sqlite3.connect(db_file, detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
+        return conn
+    except Error as e:
+        print(e)
+    return conn
 
-        len_s1, len_s2 = len(s1), len(s2)
-        max_dist = max(len_s1, len_s2) // 2 - 1
-        match = 0
+# Function to create tables for vendors and payments
+def create_tables(conn):
+    """Create vendors and payments tables"""
+    try:
+        c = conn.cursor()
+        c.execute('''
+        CREATE TABLE IF NOT EXISTS vendors (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            address TEXT NOT NULL
+        )
+        ''')
+        c.execute('''
+        CREATE TABLE IF NOT EXISTS payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            vendor_id INTEGER,
+            amount REAL NOT NULL,
+            description TEXT NOT NULL,
+            payment_type TEXT NOT NULL CHECK(payment_type IN ('ad_hoc', 'recurring')),
+            payment_date TIMESTAMP NOT NULL,
+            FOREIGN KEY (vendor_id) REFERENCES vendors (id)
+        )
+        ''')
+        conn.commit()
+    except Error as e:
+        print(e)
 
-        # Flags to mark matches
-        s1_matches = [False] * len_s1
-        s2_matches = [False] * len_s2
+# Database setup
+conn = create_connection('payments.db')
+create_tables(conn)
 
-        # Count matches
-        for i in range(len_s1):
-            start = max(0, i - max_dist)
-            end = min(i + max_dist + 1, len_s2)
-            for j in range(start, end):
-                if s1[i] == s2[j] and not s2_matches[j]:
-                    s1_matches[i] = True
-                    s2_matches[j] = True
-                    match += 1
-                    break
+class Payment:
+    def __init__(self, vendor_id, amount, description, payment_type):
+        self.vendor_id = vendor_id
+        self.amount = amount
+        self.description = description
+        self.payment_type = payment_type
+        self.timestamp = datetime.datetime.now(pytz.utc)
 
-        if match == 0:
-            return 0.0
+    def process_payment(self):
+        try:
+            # Logic for processing payment
+            print(f"Processing {self.payment_type} payment: {self.description} for amount: ${self.amount}")
+            # Here you would add integration with a payment gateway
+            # Insert payment record into the database
+            c.execute('''
+            INSERT INTO payments (vendor_id, amount, description, payment_type, payment_date)
+            VALUES (?, ?, ?, ?, ?)
+            ''', (self.vendor_id, self.amount, self.description, self.payment_type, self.timestamp))
+            conn.commit()
+        except Error as e:
+            print(f"An error occurred while processing the payment: {e}")
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
 
-        # Count transpositions
-        t = 0
-        point = 0
-        for i in range(len_s1):
-            if s1_matches[i]:
-                while not s2_matches[point]:
-                    point += 1
-                if s1[i] != s2[point]:
-                    t += 1
-                point += 1
-        t /= 2
+# Additional classes and functions as in previous example...
 
-        # Jaro distance formula
-        return (match / len_s1 + match / len_s2 + (match - t) / match) / 3.0
+# At the end of the day, show all payments
+def show_payments(conn):
+    try:
+        c = conn.cursor()
+        c.execute('SELECT * FROM payments WHERE payment_type = "ad_hoc" OR payment_type = "recurring"')
+        payments = c.fetchall()
+        for payment in payments:
+            print(payment)
+    except Error as e:
+        print(f"An error occurred while fetching payments: {e}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
 
-    # Apply the Jaro-Winkler adjustment
-    jaro_dist = jaro_distance(s1, s2)
-    prefix = 0
-    max_prefix_length = 4  # Maximum length of common prefix
-    for i in range(min(len(s1), len(s2))):
-        if s1[i] == s2[i]:
-            prefix += 1
-        else:
-            break
-        if prefix == max_prefix_length:
-            break
+# Use the show_payments function
+show_payments(conn)
 
-    # Jaro-Winkler formula
-    winkler_adjustment = 0.1 * prefix * (1 - jaro_dist)
-    return jaro_dist + winkler_adjustment
-
-# Function to suggest a similar word from the list
-def suggest_similar_word(input_word, word_list, threshold=0.8):
-    suggestions = [(word, jaro_winkler(input_word, word)) for word in word_list]
-    # Filter out suggestions below the threshold
-    suggestions = [s for s in suggestions if s[1] >= threshold]
-    # Sort by similarity score in descending order
-    suggestions.sort(key=lambda x: x[1], reverse=True)
-    return suggestions[0][0] if suggestions else None
-
-# Main interaction function
-def interact_and_update_list(input_word, word_list):
-    # Check for an exact match first
-    if input_word in word_list:
-        print(f"The word '{input_word}' is already in the list.")
-        return
-
-    # Get the suggestion if no exact match is found
-    suggested_word = suggest_similar_word(input_word, word_list)
-    if suggested_word:
-        print(f"Did you mean '{suggested_word}'? (yes/no): ")
-        user_response = input().strip().lower()
-        if user_response == 'yes':
-            print(f"Great! '{input_word}' will be treated as '{suggested_word}' for future suggestions.")
-            return
-        else:
-            print(f"Okay, you chose not to use the suggestion. Would you like to add '{input_word}' to the list? (yes/no): ")
-            user_response = input().strip().lower()
-            if user_response == 'yes':
-                word_list.append(input_word)
-                print(f"Word '{input_word}' has been added to the list.")
-            else:
-                print(f"No changes have been made to the list.")
-    else:
-        print(f"No similar words found for '{input_word}'.")
-        print("Would you like to add it to the list? (yes/no): ")
-        user_response = input().strip().lower()
-        if user_response == 'yes':
-            word_list.append(input_word)
-            print(f"Word '{input_word}' has been added to the list.")
-        else:
-            print("No changes have been made to the list.")
-
-# Predefined list of words
-word_list = ["apple", "application", "appetizer", "phone", "iphonex", "iphone", "app", "application"]
-
-# Get user input
-user_input = input("Enter a word: ").strip().lower()
-
-# Suggest a similar word and possibly update the list
-interact_and_update_list(user_input, word_list)
+# Close the database connection
+conn.close()
