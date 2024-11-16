@@ -1,103 +1,116 @@
 import sqlite3
-import datetime
 import logging
-from sqlite3 import Error
+import csv
+from datetime import datetime, timedelta
 
 # Configure logging
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Database setup with error handling
-def create_connection(db_file):
-    """Create a database connection to the SQLite database specified by db_file"""
-    conn = None
-    try:
-        conn = sqlite3.connect(db_file)
-        return conn
-    except Error as e:
-        logging.error(e)
-    return conn
+class PaymentScheduler:
+    def __init__(self, db_path='payments.db'):
+        self.db_path = db_path
+        self.conn = sqlite3.connect(self.db_path)
+        self._create_tables()
 
-conn = create_connection('payments.db')
-c = conn.cursor()
+    def _create_tables(self):
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS payments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                amount REAL NOT NULL,
+                date DATE NOT NULL,
+                type TEXT NOT NULL CHECK (type IN ('recurring', 'adhoc')),
+                status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'processed')),
+                interval INTEGER DEFAULT NULL,
+                vendor TEXT DEFAULT NULL
+            )
+        ''')
+        self.conn.commit()
 
-# Updated database table creation with proper datetime handling
-c.execute('''
-CREATE TABLE IF NOT EXISTS payments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    vendor_id INTEGER,
-    amount REAL NOT NULL,
-    description TEXT NOT NULL,
-    payment_type TEXT NOT NULL CHECK(payment_type IN ('ad_hoc', 'recurring')),
-    payment_date TEXT NOT NULL
-)
-''')
-conn.commit()
+    # Existing methods ...
 
-class PaymentError(Exception):
-    """Custom exception for payment processing errors"""
-    pass
+    def list_pending_payments(self):
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT * FROM payments WHERE status = 'pending'
+        ''')
+        pending_payments = cursor.fetchall()
+        print("Pending Payments:")
+        for payment in pending_payments:
+            print(payment)
 
-class Payment:
-    def __init__(self, vendor_id, amount, description, payment_type):
-        self.vendor_id = vendor_id
-        self.amount = amount
-        self.description = description
-        self.payment_type = payment_type
-        self.timestamp = datetime.datetime.now().isoformat()
+    def verify_payment(self, payment_id, expected_amount):
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM payments WHERE id = ?', (payment_id,))
+        payment = cursor.fetchone()
+        if payment and payment[1] == expected_amount:
+            print("Payment verified successfully.")
+            return True
+        else:
+            print("Payment verification failed.")
+            return False
 
-    def process_payment(self):
-        # Logic for processing payment
-        try:
-            print(f"Processing {self.payment_type} payment: {self.description} for amount: ${self.amount}")
-            # Here you would add integration with a payment gateway
-            # Insert payment record into the database with proper datetime handling
-            c.execute('''
-            INSERT INTO payments (vendor_id, amount, description, payment_type, payment_date)
-            VALUES (?, ?, ?, ?, ?)
-            ''', (self.vendor_id, self.amount, self.description, self.payment_type, self.timestamp))
-            conn.commit()
-        except Error as e:
-            logging.error(e)
-            raise PaymentError("Failed to process payment transaction.")
+    def generate_report(self):
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT vendor, COUNT(*) as frequency, SUM(amount) as total_spent
+            FROM payments
+            WHERE status = 'processed'
+            GROUP BY vendor
+            ORDER BY total_spent DESC
+        ''')
+        return cursor.fetchall()
 
-class AdHocPayment(Payment):
-    pass  # No additional attributes for ad-hoc payments
+    def export_report_to_csv(self, report_data, filename='report.csv'):
+        with open(filename, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['Vendor', 'Frequency', 'Total Spent'])
+            for data in report_data:
+                writer.writerow(data)
+        print(f"Report exported to {filename}.")
 
-class RecurringPayment(Payment):
-    def __init__(self, vendor_id, amount, description, payment_type, interval):
-        super().__init__(vendor_id, amount, description, payment_type)
-        self.interval = interval  # Could be 'monthly', 'weekly', etc.
-        self.next_payment_date = self.timestamp + datetime.timedelta(days=self.get_days_until_next_payment())
+    def command_line_interface(self):
+        while True:
+            print("\nPayment Scheduler CLI")
+            print("1. Schedule Recurring Payment")
+            print("2. Schedule Ad-hoc Payment")
+            print("3. List Pending Payments")
+            print("4. Approve Payment")
+            print("5. Process Payments")
+            print("6. Generate Report")
+            print("7. Export Report to CSV")
+            print("8. Exit")
+            choice = input("Enter your choice: ")
 
-    def get_days_until_next_payment(self):
-        if self.interval == 'monthly':
-            return 30  # Simplified monthly interval
-        # Add more interval conditions as needed
-        return 30
+            if choice == '1':
+                amount = float(input("Enter amount: "))
+                start_date = input("Enter start date (YYYY-MM-DD): ")
+                interval = int(input("Enter interval in days: "))
+                self.schedule_recurring_payment(amount, start_date, interval)
+            elif choice == '2':
+                amount = float(input("Enter amount: "))
+                date = input("Enter date (YYYY-MM-DD): ")
+                self.schedule_adhoc_payment(amount, date)
+            elif choice == '3':
+                self.list_pending_payments()
+            elif choice == '4':
+                payment_id = int(input("Enter payment ID to approve: "))
+                self.approve_payment(payment_id)
+            elif choice == '5':
+                self.process_payments()
+            elif choice == '6':
+                report = self.generate_report()
+                for row in report:
+                    print(row)
+            elif choice == '7':
+                report = self.generate_report()
+                self.export_report_to_csv(report)
+            elif choice == '8':
+                print("Exiting CLI.")
+                break
+            else:
+                print("Invalid choice. Please try again.")
 
-    def process_payment(self):
-        # Logic for processing a recurring payment
-        try:
-            print(f"Processing recurring payment: {self.description} for amount: ${self.amount}")
-            # Here you would add integration with a payment gateway
-            # Update the next payment date
-            self.timestamp = datetime.datetime.now().isoformat()
-            self.next_payment_date = self.timestamp + datetime.timedelta(days=self.get_days_until_next_payment())
-            # Insert payment record into the database with proper datetime handling
-            c.execute('''
-            INSERT INTO payments (vendor_id, amount, description, payment_type, payment_date)
-            VALUES (?, ?, ?, ?, ?)
-            ''', (self.vendor_id, self.amount, self.description, self.payment_type, self.timestamp))
-            conn.commit()
-        except Error as e:
-            logging.error(e)
-            raise PaymentError("Failed to process recurring payment transaction.")
-
-# Example usage and functions remain the same as before
-# ...
-
-# At the end of the day, show all payments
-show_payments()
-
-# Close the database connection
-conn.close()
+# Example usage:
+scheduler = PaymentScheduler()
+scheduler.command_line_interface()

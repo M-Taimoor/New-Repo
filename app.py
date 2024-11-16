@@ -1,59 +1,38 @@
-from flask import Flask, render_template, request, session, redirect, url_for
-from flask_babel import Babel, _
-from datetime import datetime
-import locale
+from gtts import gTTS
+import os
 
-app = Flask(__name__)
-app.config['BABEL_DEFAULT_LOCALE'] = 'en'
-app.config['BABEL_TRANSLATION_DIRECTORIES'] = './translations'
-app.config['SECRET_KEY'] = 'your_secret_key'
-
-babel = Babel(app)
-
-# List of supported languages
-LANGUAGES = ['en', 'es']
-
-def get_locale():
-    # Check if a language is set in the session
-    if 'lang' in session:
-        return session['lang']
+def generate_audio_instruction(text, language, filename):
+    """
+    Generate an audio instruction file in the specified language.
     
-    # If no session language, detect based on browser settings
-    return request.accept_languages.best_match(LANGUAGES)
+    :param text: Instruction text to convert into audio.
+    :param language: Language code (e.g., 'en' for English, 'es' for Spanish).
+    :param filename: Name of the output audio file.
+    """
+    try:
+        # Generate audio
+        tts = gTTS(text=text, lang=language)
+        tts.save(filename)
+        print(f"Audio instruction saved as {filename}")
+    except ValueError:
+        print(f"Error: Language '{language}' is not supported.")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
 
-# Initialize Babel with the locale selector function
-babel.init_app(app, locale_selector=get_locale)
+# Example usage
+if __name__ == "__main__":
+    # Instruction text
+    instruction_text = "Please place the robot vacuum on a flat surface before starting."
 
-@app.route('/set_language/<lang>')
-def set_language(lang):
-    if lang in LANGUAGES:
-        session['lang'] = lang  # Set the selected language in the session
-    return redirect(url_for('index'))
+    # User's preferred language (e.g., 'en' for English, 'fr' for French, 'es' for Spanish)
+    user_language = input("Enter the language code (e.g., 'en', 'es', 'fr'): ").strip().lower()
 
-@app.route('/')
-def index():
-    # Sample data for rendering
-    product_name = _("Product Name")
-    price = 99.99
-    today = datetime.now()
-    
-    return render_template(
-        'index.html',
-        product_name=product_name,
-        price=price,
-        today=today
-    )
+    # Output audio filename
+    output_file = f"instruction_{user_language}.mp3"
 
-# Currency and date formatting helpers
-def format_currency(value, currency='USD'):
-    return babel.format_currency(value, currency)
+    # Generate the audio instruction
+    generate_audio_instruction(instruction_text, user_language, output_file)
 
-def format_date(value):
-    return babel.format_date(value)
-
-# Expose helpers to templates
-app.jinja_env.globals['format_currency'] = format_currency
-app.jinja_env.globals['format_date'] = format_date
-
-if __name__ == '__main__':
-    app.run(debug=True)
+    # Play the audio (optional, for testing)
+    if os.path.exists(output_file):
+        os.system(f"start {output_file}")  # Use 'start' for Windows, 'open' for macOS, 'xdg-open' for Linux

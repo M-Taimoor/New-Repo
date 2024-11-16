@@ -79,160 +79,80 @@
 
 
 
-fimport asyncio
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Form
-from fastapi.responses import HTMLResponse
-from typing import List
-import sqlite3
 
-app = FastAPI()
 
-# Initialize the SQLite database
-conn = sqlite3.connect('auction.db')
-cursor = conn.cursor()
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS auction (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    minimum_bid REAL NOT NULL,
-    current_highest_bid REAL,
-    current_highest_bidder TEXT,
-    timer INTEGER NOT NULL,
-    is_active BOOLEAN NOT NULL CHECK (is_active IN (0, 1))
-)
-''')
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS bids (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    auction_id INTEGER NOT NULL,
-    bidder TEXT NOT NULL,
-    bid_amount REAL NOT NULL,
-    FOREIGN KEY (auction_id) REFERENCES auction (id)
-)
-''')
-conn.commit()
 
-# Auction state
-auction_state = {
-    "minimum_bid": 100,
-    "current_highest_bid": 100,
-    "current_highest_bidder": None,
-    "timer": 60,  # Timer in seconds
-    "is_active": True
+# ... (other parts of the code remain unchanged)
+
+# Define new message types
+MESSAGE_TYPES = {
+    "NEW_BID": "new_bid",
+    "AUCTION_ENDED": "auction_ended",
+    "USER_JOINED": "user_joined"
 }
 
-# List to keep track of active WebSocket connections
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: List[WebSocket] = []
+# ... (other parts of the code remain unchanged)
 
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-        print("Client connected")
-        # Send the current highest bid and timer to the connected client
-        await websocket.send_json({
-            "type": "initial",
-            "bid": auction_state["current_highest_bid"],
-            "bidder": auction_state["current_highest_bidder"],
-            "timer": auction_state["timer"]
-        })
+async def broadcast_message(message_type, data):
+    message = json.dumps({"type": message_type, "data": data})
+    for ws in manager.active_connections:
+        await ws.send_text(message)
 
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
-        print("Client disconnected")
+# ... (other parts of the code remain unchanged)
 
-    async def broadcast(self, message: str):
-        for connection in self.active_connections:
-            await connection.send_text(message)
+async def broadcast_summary():
+    # Prepare summary data
+    summary = {
+        "type": MESSAGE_TYPES["AUCTION_ENDED"],
+        "data": {
+            "winner": auction_state["current_highest_bidder"],
+            "winning_bid": auction_state["current_highest_bid"],
+            "bid_history": get_bid_history()
+        }
+    }
+    await broadcast_message(MESSAGE_TYPES["AUCTION_ENDED"], summary)
 
-# Initialize the connection manager
-manager = ConnectionManager()
+# ... (other parts of the code remain unchanged)
 
-# Retrieve auction details from the database
-def get_auction_details():
-    cursor.execute('SELECT * FROM auction WHERE is_active = 1')
-    return cursor.fetchone()
-
-# Broadcast updated auction details to all clients
-async def broadcast_auction_details():
-    while True:
-        auction_details = get_auction_details()
-        if auction_details:
-            await manager.broadcast(json.dumps({
-                "type": "auction_details",
-                "minimum_bid": auction_details[1],
-                "current_highest_bid": auction_details[2],
-                "current_highest_bidder": auction_details[3],
-                "timer": auction_details[4],
-                "is_active": auction_details[5]
-            }))
-        await asyncio.sleep(1)
-
-# Start the auction details broadcast coroutine
-asyncio.create_task(broadcast_auction_details())
-
-# WebSocket endpoint for bidding
 @app.websocket("/ws/bid")
-async def websocket_endpoint(websocket: WebSocket, form: Form):
+async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         while auction_state["is_active"]:
             data = await websocket.receive_text()
-            # Update the auction state with the new bid
             bid_value = float(data)
-            if bid_value > auction_state["current_highest_bid"]:
-                auction_state["current_highest_bid"] = bid_value
-                auction_state["current_highest_bidder"] = websocket
-                # Broadcasting received bid updates to all clients
-                await manager.broadcast(f"New highest bid: {bid_value} by {websocket}")
-                # Store the bid in the database
-                cursor.execute('INSERT INTO bids (auction_id, bidder, bid_amount) VALUES (?, ?, ?)', (1, str(websocket), bid_value))
-                conn.commit()
-                # Check if the current bidder has been outbid
-                if str(websocket) != auction_state["current_highest_bidder"]:
-                    await websocket.send_text("You have been outbid!")
+            # ... (other parts of the code remain unchanged)
+            # When the auction ends, broadcast summary
+            if bid_value >= auction_state["minimum_bid"]:
+                # ... (other parts of the code remain unchanged)
+                await broadcast_summary()  # Broadcast summary at the end of the auction
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
-# Sample HTML client for testing
-html = """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>WebSocket Auction System</title>
-</head>
-<body>
-    <h1>Real-Time Auction Bid Updates</h1>
-    <div id="bids"></div>
-    <input type="text" id="bidInput" placeholder="Enter your bid">
-    <button onclick="sendBid()">Submit Bid</button>
+# ... (other parts of the code remain unchanged)
 
-    <script>
-        const ws = new WebSocket("ws://localhost:8000/ws/bid");
+# Add a function to retrieve bid history for the summary
+def get_bid_history():
+    cursor.execute("SELECT bidder, bid_amount FROM bid_history ORDER BY id DESC")
+    return cursor.fetchall()
 
-        ws.onmessage = function(event) {
-            const bids = document.getElementById("bids");
-            const message = document.createElement("p");
-            if (event.data.includes("Time remaining")) {
-                document.getElementById("timer").textContent = event.data;
-            } else if (event.data.includes("You have been outbid!")) {
-                alert(event.data);
-            } else {
-                message.textContent = event.data;
-                bids.appendChild(message);
-            }
-        };
+# ... (other parts of the code remain unchanged)
 
-        function sendBid() {
-            const input = document.getElementById("bidInput");
-            ws.send(input.value);
-            input.value = '';
+<!-- ... (other parts of the HTML remain unchanged -->
+<script>
+    // ... (other parts of the JavaScript remain unchanged)
+    ws.onmessage = function(event) {
+        // ... (other parts of the JavaScript remain unchanged)
+        if (event.data.type === "NEW_BID") {
+            // ... (handle new bids)
+        } else if (event.data.type === "AUCTION_ENDED") {
+            // Display summary of the auction results
+            alert(`Auction ended! Winner: ${event.data.data.winner} with a bid of ${event.data.data.winning_bid}`);
+            // Show bid history
+            console.log(event.data.data.bid_history);
+        } else if (event.data.type === "USER_JOINED") {
+            // ... (handle new user joined)
         }
-    </script>
-</body>
-</html>
-"""
-
-@app.get("/")
-async def get():
-    return HTMLResponse(html)
+    };
+    // ... (other parts of the JavaScript remain unchanged)
+</script>

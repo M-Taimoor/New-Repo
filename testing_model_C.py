@@ -1,142 +1,158 @@
 import sqlite3
-import datetime
+import csv
 import logging
-from sqlite3 import Error
+from datetime import datetime, timedelta
 
 # Configure logging
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Database setup with error handling
-def create_connection(db_file):
-    """ create a database connection to the SQLite database specified by db_file """
-    conn = None
-    try:
-        conn = sqlite3.connect(db_file)
-        return conn
-    except Error as e:
-        logging.error(e)
-    return conn
+class PaymentScheduler:
+    def __init__(self, db_path='payments.db'):
+        self.db_path = db_path
+        self.conn = sqlite3.connect(self.db_path)
+        self._create_tables()
 
-conn = create_connection('payments.db')
+    def _create_tables(self):
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS payments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                amount REAL NOT NULL,
+                date DATE NOT NULL,
+                type TEXT NOT NULL CHECK (type IN ('recurring', 'adhoc')),
+                status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'processed')),
+                vendor TEXT NOT NULL
+            )
+        ''')
+        self.conn.commit()
 
-# Create tables for vendors and payments with error handling
-def create_table(conn, create_table_sql):
-    try:
-        c = conn.cursor()
-        c.execute(create_table_sql)
-    except Error as e:
-        logging.error(e)
+    def schedule_recurring_payment(self, amount, start_date, interval, vendor):
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            INSERT INTO payments (amount, date, type, status, interval, vendor)
+            VALUES (?, ?, 'recurring', 'pending', ?, ?)
+        ''', (amount, start_date, interval, vendor))
+        self.conn.commit()
+        logging.info(f"Recurring payment of {amount} scheduled with vendor {vendor}.")
 
-sql_create_vendors_table = '''
-CREATE TABLE IF NOT EXISTS vendors (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    email TEXT NOT NULL,
-    address TEXT NOT NULL
-)
-'''
+    def schedule_adhoc_payment(self, amount, date, vendor):
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            INSERT INTO payments (amount, date, type, status, vendor)
+            VALUES (?, ?, 'adhoc', 'pending', ?)
+        ''', (amount, date, vendor))
+        self.conn.commit()
+        logging.info(f"Ad-hoc payment of {amount} scheduled with vendor {vendor}.")
 
-sql_create_payments_table = '''
-CREATE TABLE IF NOT EXISTS payments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    vendor_id INTEGER,
-    amount REAL NOT NULL,
-    description TEXT NOT NULL,
-    payment_type TEXT NOT NULL CHECK(payment_type IN ('ad_hoc', 'recurring')),
-    payment_date TIMESTAMP NOT NULL,
-    FOREIGN KEY (vendor_id) REFERENCES vendors (id)
-)
-'''
+    def initiate_payment(self, payment_id):
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM payments WHERE id = ?', (payment_id,))
+        payment = cursor.fetchone()
+        if payment:
+            logging.info(f"Payment of {payment[1]} initiated, awaiting approval.")
+        else:
+            logging.error(f"Payment with ID {payment_id} not found.")
 
-if conn is not None:
-    create_table(conn, sql_create_vendors_table)
-    create_table(conn, sql_create_payments_table)
-else:
-    logging.error("Error! cannot create the database connection.")
+    def approve_payment(self, payment_id):
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM payments WHERE id = ?', (payment_id,))
+        payment = cursor.fetchone()
+        if payment:
+            if payment[4] == 'pending':
+                cursor.execute('''
+                    UPDATE payments SET status = 'approved' WHERE id = ?
+                ''', (payment_id,))
+                self.conn.commit()
+                logging.info(f"Payment of {payment[1]} approved.")
+                self.mock_payment_processor(payment[1])
+            else:
+                logging.error(f"Payment of {payment[1]} is not pending approval.")
+        else:
+            logging.error(f"Payment with ID {payment_id} not found.")
 
-# Payment processing classes with error handling
-class Payment:
-    def __init__(self, vendor_id, amount, description, payment_type):
-        self.vendor_id = vendor_id
-        self.amount = amount
-        self.description = description
-        self.payment_type = payment_type
-        self.timestamp = datetime.datetime.now().isoformat()
+    def process_payments(self):
+        cursor = self.conn.cursor()
+        today = datetime.now().date()
+        # Process recurring payments
+        cursor.execute('''
+            SELECT * FROM payments WHERE date <= ? AND type = 'recurring' AND status = 'approved'
+        ''', (today,))
+        for payment in cursor.fetchall():
+            self.initiate_payment(payment[0])
+            next_date = datetime.strptime(payment[2], '%Y-%m-%d').date() + timedelta(days=payment[5])
+            cursor.execute('''
+                UPDATE payments SET date = ? WHERE id = ?
+            ''', (next_date, payment[0]))
+            self.conn.commit()
 
-    def process_payment(self):
-        try:
-            # Logic for processing payment
-            print(f"Processing {self.payment_type} payment: {self.description} for amount: ${self.amount}")
-            # Here you would add integration with a payment gateway
-            # Insert payment record into the database
-            with conn:
-                conn.execute('''
-                INSERT INTO payments (vendor_id, amount, description, payment_type, payment_date)
-                VALUES (?, ?, ?, ?, ?)
-                ''', (self.vendor_id, self.amount, self.description, self.payment_type, self.timestamp))
-        except Error as e:
-            logging.error(e)
-        except Exception as e:
-            logging.error(f"An error occurred while processing the payment: {e}")
+        # Process ad-hoc payments
+        cursor.execute('''
+            SELECT * FROM payments WHERE date <= ? AND type = 'adhoc' AND status = 'approved'
+        ''', (today,))
+        for payment in cursor.fetchall():
+            self.initiate_payment(payment[0])
 
-class AdHocPayment(Payment):
-    pass  # No additional attributes for ad-hoc payments
+    def list_pending_payments(self):
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT * FROM payments WHERE status = 'pending'
+        ''')
+        pending_payments = cursor.fetchall()
+        for payment in pending_payments:
+            print(f"ID: {payment[0]}, Amount: {payment[1]}, Date: {payment[2]}, Vendor: {payment[5]}")
+        return pending_payments
 
-class RecurringPayment(Payment):
-    def __init__(self, vendor_id, amount, description, payment_type, interval):
-        super().__init__(vendor_id, amount, description, payment_type)
-        self.interval = interval  # Could be 'monthly', 'weekly', etc.
-        self.next_payment_date = self.timestamp + datetime.timedelta(days=self.get_days_until_next_payment())
+    def mock_payment_processor(self, amount):
+        print(f"Payment of {amount} processed.")
 
-    def get_days_until_next_payment(self):
-        if self.interval == 'monthly':
-            return 30  # Simplified monthly interval
-        # Add more interval conditions as needed
-        return 30
-
-    def process_payment(self):
-        try:
-            # Logic for processing a recurring payment
-            print(f"Processing recurring payment: {self.description} for amount: ${self.amount}")
-            # Here you would add integration with a payment gateway
-            # Update the next payment date
-            self.timestamp = datetime.datetime.now().isoformat()
-            self.next_payment_date = self.timestamp + datetime.timedelta(days=self.get_days_until_next_payment())
-            # Insert payment record into the database
-            with conn:
-                conn.execute('''
-                INSERT INTO payments (vendor_id, amount, description, payment_type, payment_date)
-                VALUES (?, ?, ?, ?, ?)
-                ''', (self.vendor_id, self.amount, self.description, self.payment_type, self.timestamp))
-        except Error as e:
-            logging.error(e)
-        except Exception as e:
-            logging.error(f"An error occurred while processing the recurring payment: {e}")
+    def __del__(self):
+        self.conn.close()
 
 # Example usage
-# Assume vendor with id 1 already exists in the database
-vendor_id = 1
-try:
-    adhoc_payment = AdHocPayment(vendor_id, 100, "Ad-Hoc Service Fee", 'ad_hoc')
-    adhoc_payment.process_payment()
+scheduler = PaymentScheduler()
+scheduler.schedule_recurring_payment(amount=1000, start_date='2023-04-01', interval=30, vendor='Vendor A') # Monthly
+scheduler.schedule_adhoc_payment(amount=500, date='2023-04-06', vendor='Vendor B') # 5 days from now
+scheduler.process_payments()
+scheduler.approve_payment(1) # Approve the first payment
 
-    recurring_payment = RecurringPayment(vendor_id, 50, "Monthly Subscription", 'recurring', 'monthly')
-    recurring_payment.process_payment()
-
-    # Function to show all ad-hoc and recurring payments at the end of the day
-    def show_payments():
-        try:
-            with conn:
-                conn.execute('SELECT * FROM payments WHERE payment_type = "ad_hoc" OR payment_type = "recurring"')
-                payments = conn.fetchall()
-                for payment in payments:
-                    print(payment)
-        except Error as e:
-            logging.error(e)
-
-    # At the end of the day, show all payments
-    show_payments()
-finally:
-    # Close the database connection
-    if conn:
-        conn.close()
+# Command-line interface
+while True:
+    print("\nCommands: add, view, approve, process, report, export, quit")
+    command = input("Enter command: ").lower()
+    if command == 'add':
+        amount = float(input("Enter amount: "))
+        date = input("Enter date (YYYY-MM-DD): ")
+        type = input("Enter type (recurring/adhoc): ")
+        vendor = input("Enter vendor name: ")
+        if type == 'recurring':
+            interval = int(input("Enter interval in days: "))
+            scheduler.schedule_recurring_payment(amount, date, interval, vendor)
+        else:
+            scheduler.schedule_adhoc_payment(amount, date, vendor)
+    elif command == 'view':
+        scheduler.list_pending_payments()
+    elif command == 'approve':
+        payment_id = int(input("Enter payment ID to approve: "))
+        scheduler.approve_payment(payment_id)
+    elif command == 'process':
+        scheduler.process_payments()
+    elif command == 'report':
+        # Generate summary report
+        cursor = scheduler.conn.cursor()
+        cursor.execute('SELECT vendor, SUM(amount) as total_spent, COUNT(*) as payment_count FROM payments WHERE status = 'processed' GROUP BY vendor')
+        for row in cursor.fetchall():
+            print(f"Vendor: {row[0]}, Total Spent: {row[1]}, Payment Count: {row[2]}")
+    elif command == 'export':
+        filename = input("Enter filename for CSV export: ")
+        with open(filename, 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['ID', 'Amount', 'Date', 'Vendor'])
+            cursor = scheduler.conn.cursor()
+            cursor.execute('SELECT * FROM payments WHERE status = 'processed'')
+            for payment in cursor.fetchall():
+                writer.writerow(payment)
+        print(f"Report exported to {filename}.")
+    elif command == 'quit':
+        break
+    else:
+        print("Invalid command.")
