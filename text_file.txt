@@ -1,0 +1,28 @@
+Sample prompt
+Here are the images please check and tell me which model response is the best and also provide the rating of each model response with the reason asked in the form.
+Please evaluate on the basis of making sense, instructions following, accuracy, efficiency, presentation , uptodate, executable code expected output  and other issues.
+
+
+ However, here are a few key points to always keep in mind while completing your tasks:
+Ideal Response:
+Make sure your ideal response code has exception handling included wherever necessary based on use case/prompt. In general, we have to assume that these codes are meant for the productionized environment where error handling is critical requirements.
+Do not use model responses as ideal responses; build your own ideal responses. However, you may take inspiration and ideas to create your own Ideal Response.
+The Ideal Response should address all the issues identified in the Model Evaluation Form.
+The Ideal Response should meet all the prompt requirements.
+ Model Evaluation:
+Please note that testing the code for each model response is mandatory. The output should be provided either via tool editor execution, Colab notebook links, or drive-uploaded screenshots. If the tested code and output are not provided, the task will be considered incomplete and will receive a lower score.
+Expected output should be tagged Yes only when model response contain the output of the code and then you have to execute the code to check whether this executed output of code matches with output predicted by model in its response,
+if it matches, than it is tagged yes.
+if it does not match it is no and
+if model response does not contain/predict any code output in its response, it should be tagged as N/A
+
+
+/////////////////////////////////
+Instruction: Check if all constraints or requests from the prompt have been addressed. If any instruction is missing or not followed, mark it as an issue.
+Accuracy: Check if the code is executable and free of logical flaws. If the code doesn’t run or has logical errors, mark it as inaccurate.
+Efficiency: Check if the response uses an efficient approach in terms of time and memory. If the solution is inefficient or really complex, mark it as an issue.
+Presentation: Check if the response is clear, well-structured, and uses proper formatting. If it's hard to read or lacks structure, mark it as an issue.
+Up-to-date: Check if the response uses modern libraries and best practices. If outdated or deprecated methods/frameworks are used, mark it as an issue.
+Executable Code: Check if the code can run out of the box. If it's incomplete or requires additional work to run, mark it as an issue.
+Expected Output: Check if the response provided you with an output and verify it after running the code. In most cases, the response does not provide an expected output. Make sure to mark it as N/A in that case.
+It is always better to ask than to assume! The document provided and communication are the two most important aspects for achieving quality work

@@ -1,184 +1,110 @@
-import sqlite3
-import logging
-import csv
-from datetime import datetime, timedelta
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+import threading
+from gtts import gTTS
 
-class PaymentScheduler:
-    def __init__(self, db_path='payments.db'):
-        self.db_path = db_path
-        self.conn = sqlite3.connect(self.db_path)
-        self._create_tables()
+def generate_audio_instruction(text, language_code, file_name):
+    """
+    Generate an audio file with the given text and language code.
 
-    def _create_tables(self):
-        cursor = self.conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS payments (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                amount REAL NOT NULL,
-                date DATE NOT NULL,
-                type TEXT NOT NULL CHECK (type IN ('recurring', 'adhoc')),
-                status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'processed')),
-                vendor TEXT NOT NULL,
-                interval INTEGER DEFAULT NULL
-            )
-        ''')
-        self.conn.commit()
+    :param text: The text to be converted to speech.
+    :param language_code: The language code (e.g., 'en' for English, 'es' for Spanish).
+    :param file_name: The name of the output audio file.
+    """
+    try:
+        # Convert the text to speech
+        tts = gTTS(text=text, lang=language_code)
+        
+        # Save the audio file
+        tts.save(file_name)
+        
+        print(f"Audio instruction saved as '{file_name}'.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
-    def schedule_recurring_payment(self, amount, start_date, interval, vendor):
-        cursor = self.conn.cursor()
-        cursor.execute('''
-            INSERT INTO payments (amount, date, type, status, vendor, interval)
-            VALUES (?, ?, 'recurring', 'pending', ?, ?)
-        ''', (amount, start_date, vendor, interval))
-        self.conn.commit()
-        logging.info(f"Recurring payment of {amount} scheduled.")
+def read_text_from_file(file_path):
+    """
+    Read text from a file.
 
-    def schedule_adhoc_payment(self, amount, date, vendor):
-        cursor = self.conn.cursor()
-        cursor.execute('''
-            INSERT INTO payments (amount, date, type, status, vendor)
-            VALUES (?, ?, 'adhoc', 'pending', ?)
-        ''', (amount, date, vendor))
-        self.conn.commit()
-        logging.info(f"Ad-hoc payment of {amount} scheduled.")
+    :param file_path: The path to the text file.
+    :return: The text read from the file.
+    """
+    with open(file_path, 'r') as file:
+        return file.read().strip()
 
-    def initiate_payment(self, payment_id):
-        cursor = self.conn.cursor()
-        cursor.execute('SELECT * FROM payments WHERE id = ?', (payment_id,))
-        payment = cursor.fetchone()
-        if payment:
-            logging.info(f"Payment of {payment[1]} initiated, awaiting approval.")
-        else:
-            logging.error(f"Payment with ID {payment_id} not found.")
+# Get the path to the text file
+text_file_path = input("Enter the path to the text file: ")
 
-    def approve_payment(self, payment_id):
-        cursor = self.conn.cursor()
-        cursor.execute('SELECT * FROM payments WHERE id = ?', (payment_id,))
-        payment = cursor.fetchone()
-        if payment:
-            if payment[4] == 'pending':
-                cursor.execute('''
-                    UPDATE payments SET status = 'approved' WHERE id = ?
-                ''', (payment_id,))
-                self.conn.commit()
-                logging.info(f"Payment of {payment[1]} approved.")
-                self.mock_payment_processor(payment[1])
-            else:
-                logging.error(f"Payment of {payment[1]} is not pending approval.")
-        else:
-            logging.error(f"Payment with ID {payment_id} not found.")
+# Read text from the file
+instruction_text = read_text_from_file(text_file_path)
 
-    def process_payments(self):
-        cursor = self.conn.cursor()
-        today = datetime.now().date()
-        # Process recurring payments
-        cursor.execute('''
-            SELECT * FROM payments WHERE date <= ? AND type = 'recurring' AND status = 'approved'
-        ''', (today,))
-        for payment in cursor.fetchall():
-            self.initiate_payment(payment[0])
-            next_date = datetime.strptime(payment[2], '%Y-%m-%d').date() + timedelta(days=payment[5])
-            cursor.execute('''
-                UPDATE payments SET date = ? WHERE id = ?
-            ''', (next_date, payment[0]))
-            self.conn.commit()
+# Define the target language
+language_code = 'en'  # Change as needed
 
-        # Process ad-hoc payments
-        cursor.execute('''
-            SELECT * FROM payments WHERE date <= ? AND type = 'adhoc' AND status = 'approved'
-        ''', (today,))
-        for payment in cursor.fetchall():
-            self.initiate_payment(payment[0])
+# Define the file name for the audio file
+file_name = f"instruction_{language_code}.mp3"
 
-    def list_pending_payments(self):
-        cursor = self.conn.cursor()
-        cursor.execute('SELECT * FROM payments WHERE status = "pending"')
-        pending_payments = cursor.fetchall()
-        print("Pending Payments:")
-        for payment in pending_payments:
-            print(f"ID: {payment[0]}, Amount: {payment[1]}, Date: {payment[2]}, Vendor: {payment[5]}")
+# Start the thread to generate the audio instruction
+thread = threading.Thread(target=generate_audio_instruction, args=(instruction_text, language_code, file_name))
+thread.start()
+thread.join()  # Wait for the thread to finish
 
-    def verify_payment(self, payment_id, expected_amount):
-        cursor = self.conn.cursor()
-        cursor.execute('SELECT amount FROM payments WHERE id = ?', (payment_id,))
-        actual_amount = cursor.fetchone()[0]
-        return actual_amount == expected_amount
+print("Audio instruction generation complete.")
 
-    def generate_report(self):
-        cursor = self.conn.cursor()
-        cursor.execute('''
-            SELECT vendor, COUNT(*) AS frequency, SUM(amount) AS total_spent
-            FROM payments
-            GROUP BY vendor
-            ORDER BY total_spent DESC
-        ''')
-        report = cursor.fetchall()
-        print("Spending Report:")
-        for vendor, frequency, total_spent in report:
-            print(f"Vendor: {vendor}, Frequency: {frequency}, Total Spent: {total_spent}")
-        return report
 
-    def export_report_to_csv(self, report, filename='report.csv'):
-        with open(filename, mode='w', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(['Vendor', 'Frequency', 'Total Spent'])
-            for row in report:
-                writer.writerow(row)
 
-    def mock_payment_processor(self, amount):
-        print(f"Payment of {amount} processed.")
+# from gtts import gTTS
+# import threading
+# from queue import Queue
+# from langdetect import detect
 
-    def __del__(self):
-        self.conn.close()
+# def generate_audio_instruction(text, language_code, file_name):
+#     """
+#     Generate an audio file with the given text and language code.
 
-    def run_cli(self):
-        while True:
-            print("\nCommands:")
-            print("1. Add recurring payment")
-            print("2. Add ad-hoc payment")
-            print("3. List pending payments")
-            print("4. Approve payment")
-            print("5. Process payments")
-            print("6. Generate report")
-            print("7. Export report to CSV")
-            print("8. Exit")
-            command = input("Enter command number: ")
-            if command == '1':
-                amount = float(input("Enter amount: "))
-                start_date = input("Enter start date (YYYY-MM-DD): ")
-                interval = int(input("Enter interval (days): "))
-                vendor = input("Enter vendor: ")
-                self.schedule_recurring_payment(amount, start_date, interval, vendor)
-            elif command == '2':
-                amount = float(input("Enter amount: "))
-                date = input("Enter date (YYYY-MM-DD): ")
-                vendor = input("Enter vendor: ")
-                self.schedule_adhoc_payment(amount, date, vendor)
-            elif command == '3':
-                self.list_pending_payments()
-            elif command == '4':
-                payment_id = int(input("Enter payment ID to approve: "))
-                self.approve_payment(payment_id)
-            elif command == '5':
-                self.process_payments()
-            elif command == '6':
-                report = self.generate_report()
-                print(report)
-            elif command == '7':
-                if 'report' not in locals():
-                    print("No report generated. Generate a report first.")
-                else:
-                    filename = input("Enter filename for the CSV export: ")
-                    self.export_report_to_csv(report, filename)
-                    print(f"Report exported to {filename}")
-            elif command == '8':
-                break
-            else:
-                print("Invalid command.")
+#     :param text: The text to be converted to speech.
+#     :param language_code: The language code (e.g., 'en' for English, 'es' for Spanish).
+#     :param file_name: The name of the output audio file.
+#     """
+#     try:
+#         # Convert the text to speech
+#         tts = gTTS(text=text, lang=language_code)
+        
+#         # Save the audio file
+#         tts.save(file_name)
+        
+#         print(f"Audio instruction saved as '{file_name}'.")
+#     except Exception as e:
+#         print(f"An error occurred: {e}")
 
-# Example usage:
-scheduler = PaymentScheduler()
-scheduler.run_cli()
+# def process_text_to_speech(queue):
+#     """
+#     Process text-to-speech conversions from a queue using multi-threading.
+
+#     :param queue: A queue containing tuples of (text, language_code, file_name).
+#     """
+#     while not queue.empty():
+#         text, language_code, file_name = queue.get()
+#         generate_audio_instruction(text, language_code, file_name)
+#         queue.task_done()
+
+# # Read text from a file
+# file_path = input("Enter the path to the text file: ")
+# with open(file_path, 'r') as file:
+#     text_to_convert = file.read()
+
+# # Detect the language of the input text
+# detected_language = detect(text_to_convert)
+
+# # Define the file name
+# file_name = "instruction.mp3"
+
+# # Create a queue and add text-to-speech task
+# task_queue = Queue()
+# task_queue.put((text_to_convert, detected_language, file_name))
+
+# # Create and start thread to process the queue
+# thread = threading.Thread(target=process_text_to_speech, args=(task_queue,))
+# thread.start()
+# thread.join()
+
+# print(f"Audio instruction saved as '{file_name}' in detected language: {detected_language}.")

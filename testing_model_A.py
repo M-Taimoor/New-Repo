@@ -1,71 +1,60 @@
-import sqlite3
-import logging
-import csv
-from datetime import datetime, timedelta
+from gtts import gTTS
+import threading
+from queue import Queue
+from langdetect import detect
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+def generate_audio_instruction(text, language_code, file_name):
+    """
+    Generate an audio file with the given text and language code.
 
-class PaymentScheduler:
-    def __init__(self, db_path='payments.db'):
-        self.db_path = db_path
-        self.conn = sqlite3.connect(self.db_path)
-        self._create_tables()
+    :param text: The text to be converted to speech.
+    :param language_code: The language code (e.g., 'en' for English, 'es' for Spanish).
+    :param file_name: The name of the output audio file.
+    """
+    try:
+        # Convert the text to speech
+        tts = gTTS(text=text, lang=language_code)
+        
+        # Save the audio file
+        tts.save(file_name)
+        
+        print(f"Audio instruction saved as '{file_name}'.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
-    def _create_tables(self):
-        cursor = self.conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS payments (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                amount REAL NOT NULL,
-                date DATE NOT NULL,
-                type TEXT NOT NULL CHECK (type IN ('recurring', 'adhoc')),
-                status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'processed')),
-                interval INTEGER DEFAULT NULL
-            )
-        ''')
-        self.conn.commit()
+def process_text_to_speech(queue):
+    """
+    Process text-to-speech conversions from a queue using multi-threading.
 
-    # Other methods as defined earlier...
+    :param queue: A queue containing tuples of (text, language_code, file_name).
+    """
+    while not queue.empty():
+        text, language_code, file_name = queue.get()
+        generate_audio_instruction(text, language_code, file_name)
+        queue.task_done()
 
-    def list_pending_payments(self):
-        cursor = self.conn.cursor()
-        cursor.execute('''
-            SELECT * FROM payments WHERE status = 'pending'
-        ''')
-        pending_payments = cursor.fetchall()
-        for payment in pending_payments:
-            print(f"ID: {payment[0]}, Amount: {payment[1]}, Date: {payment[2]}, Type: {payment[3]}")
-        return pending_payments
+# Read text from a file
+file_path = input("Enter the path to the text file: ")
+with open(file_path, 'r') as file:
+    text_to_convert = file.read()
 
-    def verify_payment(self, payment_id, expected_amount):
-        cursor = self.conn.cursor()
-        cursor.execute('''
-            SELECT amount FROM payments WHERE id = ?
-        ''', (payment_id,))
-        actual_amount = cursor.fetchone()[0]
-        return actual_amount == expected_amount
+# Detect the language of the input text
+detected_language = detect(text_to_convert)
+print(f"Detected language: {detected_language}")
 
-    def generate_report(self):
-        cursor = self.conn.cursor()
-        cursor.execute('''
-            SELECT SUM(amount) as total_spent, COUNT(*) as payment_frequency, type FROM payments GROUP BY type
-        ''')
-        report = cursor.fetchall()
-        print("Report:")
-        for row in report:
-            print(f"Total Spent: {row[0]}, Frequency: {row[1]}, Type: {row[2]}")
-        return report
+# Define the language code and file name
+language_code = detected_language if detected_language in ['en', 'es', 'fr'] else 'en'
+file_name = f"instruction_{language_code}.mp3"
 
-    def export_report_to_csv(self, report, filename='report.csv'):
-        with open(filename, mode='w', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(['Total Spent', 'Frequency', 'Type'])
-            for row in report:
-                writer.writerow(row)
+# Create a queue and add the text-to-speech task
+task_queue = Queue()
+task_queue.put((text_to_convert, language_code, file_name))
 
-# Example usage:
-scheduler = PaymentScheduler()
-# Assume other methods and interaction logic have been implemented
-report = scheduler.generate_report()
-scheduler.export_report_to_csv(report)
+# Create and start a thread to process the queue
+thread = threading.Thread(target=process_text_to_speech, args=(task_queue,))
+thread.start()
+
+# Wait for the thread to finish
+thread.join()
+
+print(f"Audio instruction saved as '{file_name}'.")
