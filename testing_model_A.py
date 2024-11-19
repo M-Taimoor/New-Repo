@@ -1,60 +1,67 @@
-from gtts import gTTS
-import threading
-from queue import Queue
-from langdetect import detect
+class CropSimulation:
+    def __init__(self, crop_name, growth_rate):
+        self.crop_name = crop_name
+        self.growth_rate = growth_rate  # Growth rate per day (in cm)
+        self.soil_type = None
+        self.weather_conditions = None
+        self.irrigation_level = None
+        self.days = 0
 
-def generate_audio_instruction(text, language_code, file_name):
-    """
-    Generate an audio file with the given text and language code.
+    def set_soil(self, soil_type):
+        """Set soil type: 'sandy', 'clay', 'loamy'."""
+        if soil_type in ['sandy', 'clay', 'loamy']:
+            self.soil_type = soil_type
+            print(f"Selected soil type: {soil_type}")
+        else:
+            raise ValueError("Invalid soil type. Please choose from 'sandy', 'clay', or 'loamy'.")
 
-    :param text: The text to be converted to speech.
-    :param language_code: The language code (e.g., 'en' for English, 'es' for Spanish).
-    :param file_name: The name of the output audio file.
-    """
-    try:
-        # Convert the text to speech
-        tts = gTTS(text=text, lang=language_code)
-        
-        # Save the audio file
-        tts.save(file_name)
-        
-        print(f"Audio instruction saved as '{file_name}'.")
-    except Exception as e:
-        print(f"An error occurred: {e}")
+    def set_weather(self, weather_conditions):
+        """Set weather: 'sunny', 'rainy', 'dry'."""
+        if weather_conditions in ['sunny', 'rainy', 'dry']:
+            self.weather_conditions = weather_conditions
+            print(f"Weather conditions: {weather_conditions}")
+        else:
+            raise ValueError("Invalid weather conditions. Please choose from 'sunny', 'rainy', or 'dry'.")
 
-def process_text_to_speech(queue):
-    """
-    Process text-to-speech conversions from a queue using multi-threading.
+    def set_irrigation(self, irrigation_level):
+        """Set irrigation level: 'low', 'medium', 'high'."""
+        if irrigation_level in ['low', 'medium', 'high']:
+            self.irrigation_level = irrigation_level
+            print(f"Irrigation level: {irrigation_level}")
+        else:
+            raise ValueError("Invalid irrigation level. Please choose from 'low', 'medium', or 'high'.")
 
-    :param queue: A queue containing tuples of (text, language_code, file_name).
-    """
-    while not queue.empty():
-        text, language_code, file_name = queue.get()
-        generate_audio_instruction(text, language_code, file_name)
-        queue.task_done()
+    def simulate_growth(self, days):
+        """Simulate crop growth over a number of days."""
+        if self.soil_type and self.weather_conditions and self.irrigation_level:
+            self.days = days
 
-# Read text from a file
-file_path = input("Enter the path to the text file: ")
-with open(file_path, 'r') as file:
-    text_to_convert = file.read()
+            # Adjust growth rate based on soil type
+            soil_modifier = {'sandy': 0.8, 'clay': 0.9, 'loamy': 1.0}.get(self.soil_type, 1.0)
 
-# Detect the language of the input text
-detected_language = detect(text_to_convert)
-print(f"Detected language: {detected_language}")
+            # Adjust growth rate based on weather conditions
+            weather_modifier = {'sunny': 1.2, 'rainy': 1.0, 'dry': 0.7}.get(self.weather_conditions, 1.0)
 
-# Define the language code and file name
-language_code = detected_language if detected_language in ['en', 'es', 'fr'] else 'en'
-file_name = f"instruction_{language_code}.mp3"
+            # Adjust growth rate based on irrigation level
+            irrigation_modifier = {'low': 0.6, 'medium': 1.0, 'high': 1.3}.get(self.irrigation_level, 1.0)
 
-# Create a queue and add the text-to-speech task
-task_queue = Queue()
-task_queue.put((text_to_convert, language_code, file_name))
+            # Calculate total growth
+            total_growth = self.growth_rate * soil_modifier * weather_modifier * irrigation_modifier * days
 
-# Create and start a thread to process the queue
-thread = threading.Thread(target=process_text_to_speech, args=(task_queue,))
-thread.start()
+            print(f"Simulating growth for {days} days...")
+            print(f"Total growth for {self.crop_name}: {total_growth:.2f} cm")
+        else:
+            raise ValueError("Please set soil type, weather conditions, and irrigation level before simulating growth.")
 
-# Wait for the thread to finish
-thread.join()
+# Example Usage of the DSL
+if __name__ == "__main__":
+    # Create a simulation for wheat
+    wheat_simulation = CropSimulation("Wheat", growth_rate=2.5)  # Growth rate in cm/day
 
-print(f"Audio instruction saved as '{file_name}'.")
+    # Configure the scenario
+    wheat_simulation.set_soil("loamy")
+    wheat_simulation.set_weather("rainy")
+    wheat_simulation.set_irrigation("high")
+
+    # Simulate growth over 30 days
+    wheat_simulation.simulate_growth(30)

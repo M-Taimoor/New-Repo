@@ -1,110 +1,50 @@
+import pandas as pd
+import statsmodels.api as sm
+from itertools import product
+import numpy as np
+import logging
 
-import threading
-from gtts import gTTS
+# Configure logging
+logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def generate_audio_instruction(text, language_code, file_name):
-    """
-    Generate an audio file with the given text and language code.
+# Sample data: Variations of headers, images, and descriptions with corresponding conversions
+raw_data = [
+    ["Header A", "Image X", "Desc 1", 50, 500],
+    ["Header A", "Image Y", "Desc 1", 65, 600],
+    ["Header B", "Image X", "Desc 2", 80, 700],
+    ["Header B", "Image Y", "Desc 2", 75, 750],
+    ["Header C", "Image X", "Desc 3", 90, 800],
+    ["Header C", "Image Y", "Desc 3", 85, 850],
+]
 
-    :param text: The text to be converted to speech.
-    :param language_code: The language code (e.g., 'en' for English, 'es' for Spanish).
-    :param file_name: The name of the output audio file.
-    """
-    try:
-        # Convert the text to speech
-        tts = gTTS(text=text, lang=language_code)
-        
-        # Save the audio file
-        tts.save(file_name)
-        
-        print(f"Audio instruction saved as '{file_name}'.")
-    except Exception as e:
-        print(f"An error occurred: {e}")
+# Convert to DataFrame
+df = pd.DataFrame(raw_data, columns=["Header", "Image", "Description", "Conversions", "Visitors"])
 
-def read_text_from_file(file_path):
-    """
-    Read text from a file.
+# Convert all columns to numeric, coerce errors to NaN, then drop invalid rows
+df[["Conversions", "Visitors"]] = df[["Conversions", "Visitors"]].apply(pd.to_numeric, errors='coerce')
+df.dropna(inplace=True)
 
-    :param file_path: The path to the text file.
-    :return: The text read from the file.
-    """
-    with open(file_path, 'r') as file:
-        return file.read().strip()
+# Ensure that X and y are numeric
+X = df[["Header", "Image", "Description"].astype(str)
+y = df["Conversions"] / df["Visitors"]
 
-# Get the path to the text file
-text_file_path = input("Enter the path to the text file: ")
+# Ensure that y contains no infinite or NaN values
+X = X[~y.isna()]
+y = y[~y.isna()]
 
-# Read text from the file
-instruction_text = read_text_from_file(text_file_path)
+# One-hot encode categorical variables
+X_encoded = pd.get_dummies(X, drop_first=True)
 
-# Define the target language
-language_code = 'en'  # Change as needed
+# Fit OLS model
+model = sm.OLS(y, sm.add_constant(X_encoded)).fit()
 
-# Define the file name for the audio file
-file_name = f"instruction_{language_code}.mp3"
+# Display the dataset and the model summary
+print("Dataset for Multivariate Testing:")
+print(df)
+print("\nMultivariate Testing Results:")
+print(model.summary())
 
-# Start the thread to generate the audio instruction
-thread = threading.Thread(target=generate_audio_instruction, args=(instruction_text, language_code, file_name))
-thread.start()
-thread.join()  # Wait for the thread to finish
-
-print("Audio instruction generation complete.")
-
-
-
-# from gtts import gTTS
-# import threading
-# from queue import Queue
-# from langdetect import detect
-
-# def generate_audio_instruction(text, language_code, file_name):
-#     """
-#     Generate an audio file with the given text and language code.
-
-#     :param text: The text to be converted to speech.
-#     :param language_code: The language code (e.g., 'en' for English, 'es' for Spanish).
-#     :param file_name: The name of the output audio file.
-#     """
-#     try:
-#         # Convert the text to speech
-#         tts = gTTS(text=text, lang=language_code)
-        
-#         # Save the audio file
-#         tts.save(file_name)
-        
-#         print(f"Audio instruction saved as '{file_name}'.")
-#     except Exception as e:
-#         print(f"An error occurred: {e}")
-
-# def process_text_to_speech(queue):
-#     """
-#     Process text-to-speech conversions from a queue using multi-threading.
-
-#     :param queue: A queue containing tuples of (text, language_code, file_name).
-#     """
-#     while not queue.empty():
-#         text, language_code, file_name = queue.get()
-#         generate_audio_instruction(text, language_code, file_name)
-#         queue.task_done()
-
-# # Read text from a file
-# file_path = input("Enter the path to the text file: ")
-# with open(file_path, 'r') as file:
-#     text_to_convert = file.read()
-
-# # Detect the language of the input text
-# detected_language = detect(text_to_convert)
-
-# # Define the file name
-# file_name = "instruction.mp3"
-
-# # Create a queue and add text-to-speech task
-# task_queue = Queue()
-# task_queue.put((text_to_convert, detected_language, file_name))
-
-# # Create and start thread to process the queue
-# thread = threading.Thread(target=process_text_to_speech, args=(task_queue,))
-# thread.start()
-# thread.join()
-
-# print(f"Audio instruction saved as '{file_name}' in detected language: {detected_language}.")
+# Best combination for maximum conversion rate
+best_combination = X_encoded.iloc[model.predict(X_encoded).idxmax()].drop('const')
+print("\nBest Combination for Maximum Conversion Rate:")
+print(best_combination)
