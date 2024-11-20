@@ -1,67 +1,85 @@
 class CropSimulation:
+    """Class representing crop simulation."""
+
+    MODIFIERS = {
+        'soil': {
+            'sandy': 0.8,
+            'clay': 0.9,
+            'loamy': 1.0
+        },
+        'weather': {
+            'sunny': 1.2,
+            'rainy': 1.0,
+            'dry': 0.7
+        },
+        'irrigation': {
+            'low': 0.6,
+            'medium': 1.0,
+            'high': 1.3
+        }
+    }
+
     def __init__(self, crop_name, growth_rate):
+        """Initialize the CropSimulation instance."""
         self.crop_name = crop_name
         self.growth_rate = growth_rate  # Growth rate per day (in cm)
-        self.soil_type = None
-        self.weather_conditions = None
-        self.irrigation_level = None
+        self.parameters = {
+            'soil': None,
+            'weather': None,
+            'irrigation': None
+        }
         self.days = 0
 
-    def set_soil(self, soil_type):
-        """Set soil type: 'sandy', 'clay', 'loamy'."""
-        if soil_type in ['sandy', 'clay', 'loamy']:
-            self.soil_type = soil_type
-            print(f"Selected soil type: {soil_type}")
+    def set_parameter(self, parameter, value):
+        """Set a parameter: 'soil', 'weather', or 'irrigation'."""
+        if parameter in self.MODIFIERS and value in self.MODIFIERS[parameter]:
+            self.parameters[parameter] = value
+            print(f"Selected {parameter}: {value}")
         else:
-            raise ValueError("Invalid soil type. Please choose from 'sandy', 'clay', or 'loamy'.")
-
-    def set_weather(self, weather_conditions):
-        """Set weather: 'sunny', 'rainy', 'dry'."""
-        if weather_conditions in ['sunny', 'rainy', 'dry']:
-            self.weather_conditions = weather_conditions
-            print(f"Weather conditions: {weather_conditions}")
-        else:
-            raise ValueError("Invalid weather conditions. Please choose from 'sunny', 'rainy', or 'dry'.")
-
-    def set_irrigation(self, irrigation_level):
-        """Set irrigation level: 'low', 'medium', 'high'."""
-        if irrigation_level in ['low', 'medium', 'high']:
-            self.irrigation_level = irrigation_level
-            print(f"Irrigation level: {irrigation_level}")
-        else:
-            raise ValueError("Invalid irrigation level. Please choose from 'low', 'medium', or 'high'.")
+            raise ValueError(f"Invalid {parameter}. Must be one of {list(self.MODIFIERS[parameter].keys())}.")
 
     def simulate_growth(self, days):
         """Simulate crop growth over a number of days."""
-        if self.soil_type and self.weather_conditions and self.irrigation_level:
-            self.days = days
+        if not isinstance(days, int) or days <= 0:
+            raise ValueError("Number of days must be a positive integer.")
 
-            # Adjust growth rate based on soil type
-            soil_modifier = {'sandy': 0.8, 'clay': 0.9, 'loamy': 1.0}.get(self.soil_type, 1.0)
+        self.days = days
 
-            # Adjust growth rate based on weather conditions
-            weather_modifier = {'sunny': 1.2, 'rainy': 1.0, 'dry': 0.7}.get(self.weather_conditions, 1.0)
+        # Adjust growth rate based on parameters
+        total_modifier = 1.0
+        for parameter, value in self.parameters.items():
+            total_modifier *= self.MODIFIERS[parameter].get(value, 1.0)
 
-            # Adjust growth rate based on irrigation level
-            irrigation_modifier = {'low': 0.6, 'medium': 1.0, 'high': 1.3}.get(self.irrigation_level, 1.0)
+        # Calculate total growth
+        total_growth = self.growth_rate * total_modifier * days
 
-            # Calculate total growth
-            total_growth = self.growth_rate * soil_modifier * weather_modifier * irrigation_modifier * days
+        print(f"Simulating growth for {days} days...")
+        print(f"Total growth for {self.crop_name}: {total_growth:.2f} cm")
 
-            print(f"Simulating growth for {days} days...")
-            print(f"Total growth for {self.crop_name}: {total_growth:.2f} cm")
-        else:
-            raise ValueError("Please set soil type, weather conditions, and irrigation level before simulating growth.")
+    def get_parameters(self):
+        """Get the current parameter values."""
+        return self.parameters
+
 
 # Example Usage of the DSL
 if __name__ == "__main__":
     # Create a simulation for wheat
     wheat_simulation = CropSimulation("Wheat", growth_rate=2.5)  # Growth rate in cm/day
 
-    # Configure the scenario
-    wheat_simulation.set_soil("loamy")
-    wheat_simulation.set_weather("rainy")
-    wheat_simulation.set_irrigation("high")
+    # Show available parameters
+    print("Available parameters:")
+    for parameter, values in CropSimulation.MODIFIERS.items():
+        print(f"{parameter}: {list(values.keys())}")
+
+    # Set parameters based on user input
+    soil = input("Enter soil type (sandy, clay, loamy): ")
+    weather = input("Enter weather conditions (sunny, rainy, dry): ")
+    irrigation = input("Enter irrigation level (low, medium, high): ")
+
+    # Set parameters
+    wheat_simulation.set_parameter('soil', soil)
+    wheat_simulation.set_parameter('weather', weather)
+    wheat_simulation.set_parameter('irrigation', irrigation)
 
     # Simulate growth over 30 days
     wheat_simulation.simulate_growth(30)
