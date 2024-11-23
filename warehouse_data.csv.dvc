@@ -1,0 +1,5 @@
+outs:
+- md5: a26bd78cd3d551a23509199cc05c39ce
+  size: 101
+  hash: md5
+  path: warehouse_data.csv
