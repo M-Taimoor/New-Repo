@@ -1,56 +1,126 @@
-# Crop Simulation DSL
-class CropSimulation:
-    def __init__(self, crop_name, growth_rate):
-        self.crop_name = crop_name
-        self.growth_rate = growth_rate  # Growth rate per day (in cm)
-        self.soil_type = None
-        self.weather_conditions = None
-        self.irrigation_level = None
-        self.days = 0
+import sys
+from docx import Document
+import PyPDF2
 
-    def set_soil(self, soil_type):
-        """Set soil type: 'sandy', 'clay', 'loamy'."""
-        self.soil_type = soil_type
-        print(f"Selected soil type: {soil_type}")
+# Dictionary mapping characters to their Braille equivalents
+braille_dict = {
+    'A': [1, 0, 0, 0],
+    'B': [1, 1, 0, 0],
+    'C': [1, 0, 1, 0],
+    'D': [1, 0, 1, 1],
+    'E': [1, 0, 0, 1],
+    'F': [1, 1, 1, 0],
+    'G': [1, 1, 1, 1],
+    'H': [1, 1, 0, 1],
+    'I': [0, 1, 1, 0],
+    'J': [0, 1, 1, 1],
+    'K': [1, 0, 0, 0],
+    'L': [1, 1, 0, 0],
+    'M': [1, 0, 1, 0],
+    'N': [1, 0, 1, 1],
+    'O': [1, 0, 0, 1],
+    'P': [1, 1, 1, 0],
+    'Q': [1, 1, 1, 1],
+    'R': [1, 1, 0, 1],
+    'S': [0, 1, 1, 0],
+    'T': [0, 1, 1, 1],
+    'U': [1, 0, 0, 0],
+    'V': [1, 1, 0, 0],
+    'W': [0, 1, 1, 1],
+    'X': [1, 0, 1, 0],
+    'Y': [1, 0, 1, 1],
+    'Z': [1, 0, 0, 1],
+    '0': [0, 0, 1, 1],
+    '1': [1, 0, 0, 0],
+    '2': [1, 1, 0, 0],
+    '3': [1, 0, 1, 0],
+    '4': [1, 0, 1, 1],
+    '5': [1, 0, 0, 1],
+    '6': [1, 1, 1, 0],
+    '7': [1, 1, 1, 1],
+    '8': [1, 1, 0, 1],
+    '9': [0, 1, 1, 0],
+    '.': [1, 1, 1, 0],
+    ',': [1, 0, 1, 1],
+    '!': [1, 0, 0, 0],
+    '?': [0, 1, 0, 0],
+    ' ': [0, 0, 0, 0]  # Space handling
+}
 
-    def set_weather(self, weather_conditions):
-        """Set weather: 'sunny', 'rainy', 'dry'."""
-        self.weather_conditions = weather_conditions
-        print(f"Weather conditions: {weather_conditions}")
+# Unicode Braille patterns for visual representation
+unicode_braille_patterns = {
+    1: '⠁',  # Dot 1
+    2: '⠃',  # Dot 2
+    4: '⠉',  # Dot 3
+    8: '⠙',  # Dot 4
+    16: '⠑',  # Dot 5
+    32: '⠋',  # Dot 6
+    64: '⠛',  # Dot 7
+    128: '⠓',  # Dot 8
+    0: '⠿'  # Placeholder for unsupported characters
+}
 
-    def set_irrigation(self, irrigation_level):
-        """Set irrigation level: 'low', 'medium', 'high'."""
-        self.irrigation_level = irrigation_level
-        print(f"Irrigation level: {irrigation_level}")
 
-    def simulate_growth(self, days):
-        """Simulate crop growth over a number of days."""
-        self.days = days
+def translate_to_braille(text):
+    """Translates a given text to Braille."""
+    braille_output = []
+    for char in text:
+        if char.upper() in braille_dict:
+            braille_output.append(braille_dict[char.upper()])
+        else:
+            braille_output.append([0, 0, 0, 0])  # Placeholder for unsupported characters
+    return braille_output
 
-        # Adjust growth rate based on soil type
-        soil_modifier = {'sandy': 0.8, 'clay': 0.9, 'loamy': 1.0}.get(self.soil_type, 1.0)
 
-        # Adjust growth rate based on weather conditions
-        weather_modifier = {'sunny': 1.2, 'rainy': 1.0, 'dry': 0.7}.get(self.weather_conditions, 1.0)
+def process_file(file_path):
+    """Processes a file (.txt, .docx, .pdf) and returns its text content."""
+    try:
+        if file_path.endswith('.docx'):
+            document = Document(file_path)
+            return '\n'.join(paragraph.text for paragraph in document.paragraphs)
+        elif file_path.endswith('.pdf'):
+            with open(file_path, 'rb') as pdf_file:
+                reader = PyPDF2.PdfReader(pdf_file)
+                return '\n'.join(page.extract_text() for page in reader.pages)
+        elif file_path.endswith('.txt'):
+            with open(file_path, 'r', encoding='utf-8') as text_file:
+                return text_file.read()
+        else:
+            raise ValueError(f"Unsupported file format: {file_path}")
+    except FileNotFoundError:
+        print(f"Error: The file '{file_path}' was not found.")
+        raise
+    except Exception as e:
+        print(f"An error occurred while processing the file: {e}")
+        raise
 
-        # Adjust growth rate based on irrigation level
-        irrigation_modifier = {'low': 0.6, 'medium': 1.0, 'high': 1.3}.get(self.irrigation_level, 1.0)
 
-        # Calculate total growth
-        total_growth = self.growth_rate * soil_modifier * weather_modifier * irrigation_modifier * days
+def display_braille_output(braille_output):
+    """Displays the Braille output in a visually structured format."""
+    for line in braille_output:
+        print(' '.join(unicode_braille_patterns.get(dot, '⠿') for dot in line))
 
-        print(f"Simulating growth for {days} days...")
-        print(f"Total growth for {self.crop_name}: {total_growth:.2f} cm")
 
-# Example Usage of the DSL
+def main():
+    """Main function to handle command-line arguments and process input text or files."""
+    try:
+        if len(sys.argv) < 2:
+            print("Usage: python script.py <text or file_path>")
+            return
+
+        input_text = sys.argv[1]
+        if input_text.endswith(('.txt', '.docx', '.pdf')):
+            text = process_file(input_text)
+        else:
+            text = input_text
+
+        braille_output = translate_to_braille(text)
+        print("Braille Output:")
+        display_braille_output(braille_output)
+
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+
+
 if __name__ == "__main__":
-    # Create a simulation for wheat
-    wheat_simulation = CropSimulation("Wheat", growth_rate=2.5)  # Growth rate in cm/day
-
-    # Configure the scenario
-    wheat_simulation.set_soil("loamy")
-    wheat_simulation.set_weather("rainy")
-    wheat_simulation.set_irrigation("high")
-
-    # Simulate growth over 30 days
-    wheat_simulation.simulate_growth(30)
+    main()

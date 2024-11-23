@@ -1,85 +1,122 @@
-class CropSimulation:
-    """Class representing crop simulation."""
+import sys
+import io
+from docx import Document
+try:
+    import PyPDF2
+except ModuleNotFoundError:
+    print("Error: PyPDF2 module is not installed. Please install it using pip.")
+    sys.exit(1)
 
-    MODIFIERS = {
-        'soil': {
-            'sandy': 0.8,
-            'clay': 0.9,
-            'loamy': 1.0
-        },
-        'weather': {
-            'sunny': 1.2,
-            'rainy': 1.0,
-            'dry': 0.7
-        },
-        'irrigation': {
-            'low': 0.6,
-            'medium': 1.0,
-            'high': 1.3
-        }
-    }
+# Dictionary mapping characters to their Braille equivalents
+braille_dict = {
+    'A': [1, 0, 0, 0],
+    'B': [1, 1, 0, 0],
+    'C': [1, 0, 1, 0],
+    'D': [1, 0, 1, 1],
+    'E': [1, 0, 0, 1],
+    'F': [1, 1, 1, 0],
+    'G': [1, 1, 1, 1],
+    'H': [1, 1, 0, 1],
+    'I': [0, 1, 1, 0],
+    'J': [0, 1, 1, 1],
+    'K': [1, 0, 0, 0],
+    'L': [1, 1, 0, 0],
+    'M': [1, 0, 1, 0],
+    'N': [1, 0, 1, 1],
+    'O': [1, 0, 0, 1],
+    'P': [1, 1, 1, 0],
+    'Q': [1, 1, 1, 1],
+    'R': [1, 1, 0, 1],
+    'S': [0, 1, 1, 0],
+    'T': [0, 1, 1, 1],
+    'U': [1, 0, 0, 0],
+    'V': [1, 1, 0, 0],
+    'W': [0, 1, 1, 1],
+    'X': [1, 0, 1, 0],
+    'Y': [1, 0, 1, 1],
+    'Z': [1, 0, 0, 1],
+    '0': [0, 0, 1, 1],
+    '1': [1, 0, 0, 0],
+    '2': [1, 1, 0, 0],
+    '3': [1, 0, 1, 0],
+    '4': [1, 0, 1, 1],
+    '5': [1, 0, 0, 1],
+    '6': [1, 1, 1, 0],
+    '7': [1, 1, 1, 1],
+    '8': [1, 1, 0, 1],
+    '9': [0, 1, 1, 0],
+    '.': [1, 1, 1, 0],
+    ',': [1, 0, 1, 1],
+    '!': [1, 0, 0, 0],
+    '?': [0, 1, 0, 0],
+    ' ': [0, 0, 0, 0]  # Space handling
+}
 
-    def __init__(self, crop_name, growth_rate):
-        """Initialize the CropSimulation instance."""
-        self.crop_name = crop_name
-        self.growth_rate = growth_rate  # Growth rate per day (in cm)
-        self.parameters = {
-            'soil': None,
-            'weather': None,
-            'irrigation': None
-        }
-        self.days = 0
+# Unicode Braille patterns for visual representation
+unicode_braille_patterns = {
+    1: '⠁',  # Dot 1
+    2: '⠃',  # Dot 2
+    4: '⠉',  # Dot 3
+    8: '⠙',  # Dot 4
+    16: '⠑',  # Dot 5
+    32: '⠋',  # Dot 6
+    64: '⠛',  # Dot 7
+    128: '⠓',  # Dot 8
+    0: '⠿'  # No dots (for unsupported characters)
+}
 
-    def set_parameter(self, parameter, value):
-        """Set a parameter: 'soil', 'weather', or 'irrigation'."""
-        if parameter in self.MODIFIERS and value in self.MODIFIERS[parameter]:
-            self.parameters[parameter] = value
-            print(f"Selected {parameter}: {value}")
+
+def translate_to_braille(text):
+    """Translates a given text to Braille."""
+    braille_output = []
+    for char in text:
+        # Check if the character is in the Braille dictionary
+        if char.upper() in braille_dict:
+            braille_output.append(braille_dict[char.upper()])
         else:
-            raise ValueError(f"Invalid {parameter}. Must be one of {list(self.MODIFIERS[parameter].keys())}.")
-
-    def simulate_growth(self, days):
-        """Simulate crop growth over a number of days."""
-        if not isinstance(days, int) or days <= 0:
-            raise ValueError("Number of days must be a positive integer.")
-
-        self.days = days
-
-        # Adjust growth rate based on parameters
-        total_modifier = 1.0
-        for parameter, value in self.parameters.items():
-            total_modifier *= self.MODIFIERS[parameter].get(value, 1.0)
-
-        # Calculate total growth
-        total_growth = self.growth_rate * total_modifier * days
-
-        print(f"Simulating growth for {days} days...")
-        print(f"Total growth for {self.crop_name}: {total_growth:.2f} cm")
-
-    def get_parameters(self):
-        """Get the current parameter values."""
-        return self.parameters
+            braille_output.append([0, 0, 0, 0])  # Placeholder for unsupported characters
+    return braille_output
 
 
-# Example Usage of the DSL
+def process_text_file(file_path):
+    """Processes a text file and prints its Braille translation."""
+    try:
+        if file_path.endswith('.docx'):
+            document = Document(file_path)
+            text = '\n'.join(paragraph.text for paragraph in document.paragraphs)
+        elif file_path.endswith('.pdf'):
+            with open(file_path, 'rb') as pdf_file:
+                reader = PyPDF2.PdfReader(pdf_file)
+                text = '\n'.join(page.extract_text() for page in reader.pages)
+        else:
+            raise ValueError(f"Unsupported file format: {file_path}")
+
+        braille_output = translate_to_braille(text)
+        print("Braille Output:")
+        for line in braille_output:
+            print(' '.join(unicode_braille_patterns[dot] for dot in line))
+
+    except FileNotFoundError:
+        print(f"Error: The file '{file_path}' was not found.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+
+def main():
+    """Main function to handle command-line arguments and process input text or files."""
+    if len(sys.argv) < 2:
+        print("Please provide input text or a file path.")
+        return
+
+    input_text = sys.argv[1]
+    if input_text.endswith(('.txt', '.docx', '.pdf')):
+        process_text_file(input_text)
+    else:
+        braille_output = translate_to_braille(input_text)
+        print("Braille Output:")
+        for line in braille_output:
+            print(' '.join(unicode_braille_patterns[dot] for dot in line))
+
+
 if __name__ == "__main__":
-    # Create a simulation for wheat
-    wheat_simulation = CropSimulation("Wheat", growth_rate=2.5)  # Growth rate in cm/day
-
-    # Show available parameters
-    print("Available parameters:")
-    for parameter, values in CropSimulation.MODIFIERS.items():
-        print(f"{parameter}: {list(values.keys())}")
-
-    # Set parameters based on user input
-    soil = input("Enter soil type (sandy, clay, loamy): ")
-    weather = input("Enter weather conditions (sunny, rainy, dry): ")
-    irrigation = input("Enter irrigation level (low, medium, high): ")
-
-    # Set parameters
-    wheat_simulation.set_parameter('soil', soil)
-    wheat_simulation.set_parameter('weather', weather)
-    wheat_simulation.set_parameter('irrigation', irrigation)
-
-    # Simulate growth over 30 days
-    wheat_simulation.simulate_growth(30)
+    main()
