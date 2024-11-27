@@ -1,0 +1,64 @@
+2024-11-26 09:51:10,753 - INFO - Solving differential equation...
+2024-11-26 09:52:37,203 - INFO - User input equation: 20/12 =f(4,0.001)
+2024-11-26 09:52:43,755 - INFO - User input solver method: RK45
+2024-11-26 09:52:51,103 - INFO - User input tolerances: relative
+2024-11-26 09:52:54,617 - INFO - User input maximum iterations: 2
+2024-11-26 10:37:33,649 - INFO - Solving differential equation...
+2024-11-26 10:38:39,944 - INFO - User input equation: 20/4=f(4,0.001)
+2024-11-26 10:38:45,800 - INFO - User input solver method: RK45
+2024-11-26 10:38:52,999 - INFO - User input tolerances: absolute
+2024-11-26 10:38:55,849 - INFO - User input maximum iterations: 2
+2024-11-26 10:42:07,566 - INFO - Solving differential equation...
+2024-11-26 10:42:25,561 - INFO - User input equation: -2 * y
+2024-11-26 10:42:31,315 - INFO - User input solver method: RK45
+2024-11-26 10:42:40,264 - INFO - User input tolerances: absolute
+2024-11-26 10:42:46,288 - INFO - User input maximum iterations: 1000
+2024-11-26 10:55:07,547:ERROR:An unexpected error occurred: `y0` must be 1-dimensional.
+2024-11-26 10:55:20,368:ERROR:An unexpected error occurred: `y0` must be 1-dimensional.
+2024-11-26 10:56:04,005:ERROR:An unexpected error occurred: `y0` must be 1-dimensional.
+2024-11-26 10:58:13,173 - INFO - Solving differential equation...
+2024-11-26 10:58:17,416 - INFO - User input equation: -2 * y
+2024-11-26 10:58:24,693 - INFO - User input solver method: RK45
+2024-11-26 10:58:32,634 - INFO - User input tolerances: 1e-6,1e-12
+2024-11-26 10:58:39,540 - INFO - User input maximum iterations: 1000
+2024-11-26 10:58:39,941 - INFO - Execution time: 26.77 seconds
+2024-11-26 10:58:39,942 - INFO - Comparing numerical solution with analytical solution...
+2024-11-26 10:58:39,943 - INFO - Maximum error: 0.000000
+2024-11-26 10:58:39,943 - INFO - Stopping solver due to conditions met.
+2024-11-26 11:06:10,824:ERROR:An unexpected error occurred: `y0` must be 1-dimensional.
+2024-11-26 11:52:10,790 - INFO - Solving differential equation...
+2024-11-26 11:52:40,125 - INFO - User input equation: 2 * y
+2024-11-26 11:52:45,356 - INFO - User input solver method: RK45
+2024-11-26 11:54:50,153 - INFO - User input tolerances: 1e-6,1e-12
+2024-11-26 11:54:53,350 - INFO - User input maximum iterations: 1000
+2024-11-26 11:54:53,547 - INFO - Execution time: 162.76 seconds
+2024-11-26 11:54:53,547 - INFO - Comparing numerical solution with analytical solution...
+2024-11-26 11:54:53,548 - INFO - Maximum error: 485165793.913669
+2024-11-26 11:54:53,549 - INFO - Stopping solver due to conditions met.
+2024-11-26 12:14:15,387 - INFO - Solving differential equation...
+2024-11-26 12:14:18,595 - INFO - User input equation: 2 * y
+2024-11-26 12:14:22,708 - INFO - User input solver method: RK45
+2024-11-26 12:14:28,822 - INFO - User input tolerances: 1e-6,1e-12
+2024-11-26 12:14:32,319 - INFO - User input maximum iterations: 1000
+2024-11-26 12:14:32,494 - INFO - Execution time: 17.11 seconds
+2024-11-26 12:14:32,494 - INFO - Comparing numerical solution with analytical solution...
+2024-11-26 12:14:32,494 - INFO - Maximum error: 485165793.913669
+2024-11-26 12:14:32,495 - INFO - Stopping solver due to conditions met.
+2024-11-26 12:18:35,298 - INFO - Solving differential equation...
+2024-11-26 12:18:39,751 - INFO - User input equation: 2 * y
+2024-11-26 12:18:45,282 - INFO - User input solver method: RK45
+2024-11-26 12:18:51,310 - INFO - User input tolerances: 1e-6,1e-12
+2024-11-26 12:18:56,155 - INFO - User input maximum iterations: 1000
+2024-11-26 12:18:56,316 - INFO - Execution time: 21.02 seconds
+2024-11-26 12:18:56,317 - INFO - Comparing numerical solution with analytical solution...
+2024-11-26 12:18:56,317 - INFO - Maximum error: 485165793.913669
+2024-11-26 12:18:56,318 - INFO - Stopping solver due to conditions met.
+2024-11-26 12:21:36,365 - INFO - Solving differential equation...
+2024-11-26 12:21:38,771 - INFO - User input equation: 2 * y
+2024-11-26 12:21:44,120 - INFO - User input solver method: RK45
+2024-11-26 12:21:51,511 - INFO - User input tolerances: 1e-6,1e-12
+2024-11-26 12:21:54,751 - INFO - User input maximum iterations: 1000
+2024-11-26 12:21:54,937 - INFO - Execution time: 18.57 seconds
+2024-11-26 12:21:54,938 - INFO - Comparing numerical solution with analytical solution...
+2024-11-26 12:21:54,938 - INFO - Maximum error: 485165793.913669
+2024-11-26 12:21:54,938 - INFO - Stopping solver due to conditions met.
