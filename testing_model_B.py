@@ -1,32 +1,37 @@
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
+from flask import Flask, jsonify, request
+from flask_sqlalchemy import SQLAlchemy
+import re
 
-# Load app usage data from CSV file
-data = pd.read_csv('app_usage_data.csv')
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///library.db'
+db = SQLAlchemy(app)
 
-# Filter data for users with 3D Touch devices
-data_3d_touch = data[data['device_has_3d_touch'] == True]
+class Book(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255))
+    author = db.Column(db.String(255))
+    genre = db.Column(db.String(255))
+    publication_date = db.Column(db.Date)
 
-# Filter data for users without 3D Touch devices
-data_no_3d_touch = data[data['device_has_3d_touch'] == False]
+    def __repr__(self):
+        return f'<Book {self.title}>'
 
-# Calculate average session duration for users with 3D Touch
-avg_session_duration_3d_touch = data_3d_touch['session_duration'].mean()
+@app.route('/search', methods=['GET'])
+def search():
+    query = request.args.get('query')
+    if not query:
+        return jsonify({'error': 'Missing query parameter'}), 400
 
-# Calculate average session duration for users without 3D Touch
-avg_session_duration_no_3d_touch = data_no_3d_touch['session_duration'].mean()
+    # Remove stop words and stem words
+    query_words = [stemmer.stem(word) for word in re.findall(r'\w+', query.lower()) if word not in stop_words]
 
-# Print results
-print(f"Average session duration for users with 3D Touch: {avg_session_duration_3d_touch:.2f} seconds")
-print(f"Average session duration for users without 3D Touch: {avg_session_duration_no_3d_touch:.2f} seconds")
+    # Search for books matching the query
+    books = Book.query.filter(Book.title.like(f'%{query}%') | Book.author.like(f'%{query}%')).all()
 
-# Create bar chart comparing average session duration
-labels = ['With 3D Touch', 'Without 3D Touch']
-values = [avg_session_duration_3d_touch, avg_session_duration_no_3d_touch]
+    # Format the search results
+    results = [{'id': book.id, 'title': book.title, 'author': book.author, 'genre': book.genre, 'publication_date': book.publication_date} for book in books]
 
-plt.bar(labels, values)
-plt.xlabel('User Group')
-plt.ylabel('Average Session Duration (seconds)')
-plt.title('Impact of 3D Touch on User Engagement')
-plt.show()
+    return jsonify(results)
+
+if __name__ == '__main__':
+    app.run(debug=True)

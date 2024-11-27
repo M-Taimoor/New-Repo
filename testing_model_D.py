@@ -1,34 +1,32 @@
-import pandas as pd
-import matplotlib.pyplot as plt
+from flask import Flask, request, jsonify
+import sqlite3
 
-# Load hypothetical user engagement data
-data = {
-    'UserID': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-    'DeviceType': ['3D Touch', 'Non-3D Touch', '3D Touch', 'Non-3D Touch', '3D Touch', 'Non-3D Touch', '3D Touch', 'Non-3D Touch', '3D Touch', 'Non-3D Touch'],
-    'SessionDuration': [120, 90, 150, 80, 110, 100, 140, 85, 130, 95],
-    'ConversionRate': [0.8, 0.6, 0.9, 0.5, 0.7, 0.7, 0.8, 0.6, 0.8, 0.6]
-}
+app = Flask(__name__)
 
-df = pd.DataFrame(data)
+# Create a SQLite database
+conn = sqlite3.connect('library.db')
+c = conn.cursor()
+c.execute('''CREATE TABLE IF NOT EXISTS books
+             (id INTEGER PRIMARY KEY, title TEXT, author TEXT, genre TEXT, publication_date TEXT)''')
+conn.commit()
+conn.close()
 
-# Calculate average session duration and conversion rate for each device type
-avg_session_duration = df.groupby('DeviceType')['SessionDuration'].mean()
-avg_conversion_rate = df.groupby('DeviceType')['ConversionRate'].mean()
+# Define a function to search for books
+def search_books(query):
+    conn = sqlite3.connect('library.db')
+    c = conn.cursor()
+    c.execute('''SELECT * FROM books WHERE title LIKE ? OR author LIKE ? OR genre LIKE ?''', ('%' + query + '%', '%' + query + '%', '%' + query + '%'))
+    results = c.fetchall()
+    conn.close()
+    return results
 
-# Create a bar chart to compare average session duration
-plt.figure(figsize=(8, 6))
-avg_session_duration.plot(kind='bar', color='skyblue')
-plt.title('Average Session Duration by Device Type')
-plt.xlabel('Device Type')
-plt.ylabel('Average Session Duration (seconds)')
-plt.xticks(rotation=0)
-plt.show()
+# Define a route for the search API
+@app.route('/search', methods=['GET'])
+def search():
+    query = request.args.get('query')
+    results = search_books(query)
+    return jsonify(results)
 
-# Create a bar chart to compare average conversion rate
-plt.figure(figsize=(8, 6))
-avg_conversion_rate.plot(kind='bar', color='orange')
-plt.title('Average Conversion Rate by Device Type')
-plt.xlabel('Device Type')
-plt.ylabel('Average Conversion Rate')
-plt.xticks(rotation=0)
-plt.show()
+# Start the Flask app
+if __name__ == '__main__':
+    app.run(debug=True)

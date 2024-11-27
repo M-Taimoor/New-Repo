@@ -1,29 +1,64 @@
-import pandas as pd
-import matplotlib.pyplot as plt
+from flask import Flask, jsonify, request
+from flask_sqlalchemy import SQLAlchemy
 
-# Load user engagement data
-data = pd.read_csv("user_engagement_data.csv")
+app = Flask(__name__)
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///library.db"
+db = SQLAlchemy(app)
 
-# Filter data for users with 3D Touch devices
-users_with_3d_touch = data[data["device_has_3d_touch"] == True]
 
-# Calculate average session duration for users with 3D Touch
-avg_session_duration_3d_touch = users_with_3d_touch["session_duration"].mean()
+class Book(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(100), nullable=False)
+    author = db.Column(db.String(100), nullable=False)
+    genre = db.Column(db.String(50), nullable=False)
+    publication_date = db.Column(db.Date, nullable=False)
 
-# Filter data for users without 3D Touch devices
-users_without_3d_touch = data[data["device_has_3d_touch"] == False]
 
-# Calculate average session duration for users without 3D Touch
-avg_session_duration_no_3d_touch = users_without_3d_touch["session_duration"].mean()
+@app.route("/books", methods=["GET"])
+def get_books():
+    books = Book.query.all()
+    return jsonify([book.to_dict() for book in books])
 
-# Create a bar chart to compare average session duration
-plt.figure(figsize=(10, 6))
-plt.bar(
-    ["With 3D Touch", "Without 3D Touch"],
-    [avg_session_duration_3d_touch, avg_session_duration_no_3d_touch],
-    color=["blue", "orange"],
-)
-plt.title("Average Session Duration Comparison")
-plt.xlabel("User Group")
-plt.ylabel("Average Session Duration (seconds)")
-plt.show()
+
+@app.route("/books", methods=["POST"])
+def add_book():
+    data = request.json
+    book = Book(
+        title=data["title"],
+        author=data["author"],
+        genre=data["genre"],
+        publication_date=data["publication_date"],
+    )
+    db.session.add(book)
+    db.session.commit()
+    return jsonify(book.to_dict()), 201
+
+
+@app.route("/books/<int:book_id>", methods=["GET"])
+def get_book(book_id):
+    book = Book.query.get_or_404(book_id)
+    return jsonify(book.to_dict())
+
+
+@app.route("/books/<int:book_id>", methods=["PUT"])
+def update_book(book_id):
+    book = Book.query.get_or_404(book_id)
+    data = request.json
+    book.title = data["title"]
+    book.author = data["author"]
+    book.genre = data["genre"]
+    book.publication_date = data["publication_date"]
+    db.session.commit()
+    return jsonify(book.to_dict())
+
+
+@app.route("/books/<int:book_id>", methods=["DELETE"])
+def delete_book(book_id):
+    book = Book.query.get_or_404(book_id)
+    db.session.delete(book)
+    db.session.commit()
+    return jsonify({"message": "Book deleted"})
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
