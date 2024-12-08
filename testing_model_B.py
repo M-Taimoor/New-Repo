@@ -1,37 +1,38 @@
-from flask import Flask, jsonify, request
-from flask_sqlalchemy import SQLAlchemy
-import re
+from django.shortcuts import render
+from django.utils.translation import gettext as _
+from django.utils import translation
+from django.conf import settings
+from django import template
+from django.utils.translation import activate
 
-app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///library.db'
-db = SQLAlchemy(app)
+def home_view(request):
+    greeting = _("Hello, world!")
+    return render(request, 'home.html', {'greeting': greeting})
 
-class Book(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(255))
-    author = db.Column(db.String(255))
-    genre = db.Column(db.String(255))
-    publication_date = db.Column(db.Date)
 
-    def __repr__(self):
-        return f'<Book {self.title}>'
+class LanguageMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
 
-@app.route('/search', methods=['GET'])
-def search():
-    query = request.args.get('query')
-    if not query:
-        return jsonify({'error': 'Missing query parameter'}), 400
+    def __call__(self, request):
+        language = request.GET.get('language')
+        if language and language in settings.LANGUAGES:
+            translation.activate(language)
+            request.LANGUAGE_CODE = language
 
-    # Remove stop words and stem words
-    query_words = [stemmer.stem(word) for word in re.findall(r'\w+', query.lower()) if word not in stop_words]
+        response = self.get_response(request)
 
-    # Search for books matching the query
-    books = Book.query.filter(Book.title.like(f'%{query}%') | Book.author.like(f'%{query}%')).all()
+        return response
+    
+    MIDDLEWARE = [
+    # ... other middleware classes
+    'path.to.middleware.LanguageMiddleware',
+]
+    
 
-    # Format the search results
-    results = [{'id': book.id, 'title': book.title, 'author': book.author, 'genre': book.genre, 'publication_date': book.publication_date} for book in books]
+register = template.Library()
 
-    return jsonify(results)
-
-if __name__ == '__main__':
-    app.run(debug=True)
+@register.simple_tag
+def set_language(language):
+    activate(language)
+    return ''

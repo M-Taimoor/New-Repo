@@ -1,64 +1,38 @@
-from flask import Flask, jsonify, request
-from flask_sqlalchemy import SQLAlchemy
+# settings.py
+from django.utils.translation import gettext_lazy as _
 
-app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///library.db"
-db = SQLAlchemy(app)
+# Internationalization settings
+LANGUAGE_CODE = "en-us"  # Default language
+USE_I18N = True  # Enable internationalization
+USE_L10N = True  # Enable localization
+USE_TZ = True  # Enable time zone support
 
+LANGUAGES = [
+    ("en", _("English")),
+    ("es", _("Spanish")),
+    ("fr", _("French")),
+    # Add more languages as needed
+]
 
-class Book(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(100), nullable=False)
-    author = db.Column(db.String(100), nullable=False)
-    genre = db.Column(db.String(50), nullable=False)
-    publication_date = db.Column(db.Date, nullable=False)
+LOCALE_PATHS = [
+    BASE_DIR / "locale",  # Path to store translation files
+]
 
+# Middleware for setting the language
+MIDDLEWARE = [
+    # ...
+    "django.middleware.locale.LocaleMiddleware",  # Enable locale middleware
+    # ...
+]
 
-@app.route("/books", methods=["GET"])
-def get_books():
-    books = Book.query.all()
-    return jsonify([book.to_dict() for book in books])
+# Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/4.2/howto/static-files/
 
+STATIC_URL = "static/"
 
-@app.route("/books", methods=["POST"])
-def add_book():
-    data = request.json
-    book = Book(
-        title=data["title"],
-        author=data["author"],
-        genre=data["genre"],
-        publication_date=data["publication_date"],
-    )
-    db.session.add(book)
-    db.session.commit()
-    return jsonify(book.to_dict()), 201
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+]
 
-
-@app.route("/books/<int:book_id>", methods=["GET"])
-def get_book(book_id):
-    book = Book.query.get_or_404(book_id)
-    return jsonify(book.to_dict())
-
-
-@app.route("/books/<int:book_id>", methods=["PUT"])
-def update_book(book_id):
-    book = Book.query.get_or_404(book_id)
-    data = request.json
-    book.title = data["title"]
-    book.author = data["author"]
-    book.genre = data["genre"]
-    book.publication_date = data["publication_date"]
-    db.session.commit()
-    return jsonify(book.to_dict())
-
-
-@app.route("/books/<int:book_id>", methods=["DELETE"])
-def delete_book(book_id):
-    book = Book.query.get_or_404(book_id)
-    db.session.delete(book)
-    db.session.commit()
-    return jsonify({"message": "Book deleted"})
-
-
-if __name__ == "__main__":
-    app.run(debug=True)
+# Add this to allow serving static files during development
+STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"

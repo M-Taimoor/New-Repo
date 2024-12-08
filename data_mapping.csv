@@ -1,0 +1,6 @@
+source_column,source_data_type,mapping_rule
+customer_name,varchar,String
+customer_id,int,Number
+order_date,datetime,Date
+product_details,json,Document
+is_active,boolean,Boolean

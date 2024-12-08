@@ -1,32 +1,42 @@
-from flask import Flask, request, jsonify
-import sqlite3
+# settings.py
 
-app = Flask(__name__)
+INSTALLED_APPS = [
+    # ... other apps ...
+    'products',
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'django.contrib.sites',
+    # Localization and internationalization
+    'django.middleware.locale.LocaleMiddleware',
+]
 
-# Create a SQLite database
-conn = sqlite3.connect('library.db')
-c = conn.cursor()
-c.execute('''CREATE TABLE IF NOT EXISTS books
-             (id INTEGER PRIMARY KEY, title TEXT, author TEXT, genre TEXT, publication_date TEXT)''')
-conn.commit()
-conn.close()
+MIDDLEWARE = [
+    # ... other middleware ...
+    'django.middleware.locale.LocaleMiddleware',
+    'django.middleware.common.CommonMiddleware',
+]
 
-# Define a function to search for books
-def search_books(query):
-    conn = sqlite3.connect('library.db')
-    c = conn.cursor()
-    c.execute('''SELECT * FROM books WHERE title LIKE ? OR author LIKE ? OR genre LIKE ?''', ('%' + query + '%', '%' + query + '%', '%' + query + '%'))
-    results = c.fetchall()
-    conn.close()
-    return results
+# Internationalization
+LANGUAGE_CODE = 'en-us'
+TIME_ZONE = 'UTC'
+USE_I18N = True
+USE_L10N = True
+USE_TZ = True
 
-# Define a route for the search API
-@app.route('/search', methods=['GET'])
-def search():
-    query = request.args.get('query')
-    results = search_books(query)
-    return jsonify(results)
+# Languages supported by the site
+LANGUAGES = [
+    ('en', 'English'),
+    ('es', 'Spanish'),
+    ('fr', 'French'),
+    ('de', 'German'),
+]
 
-# Start the Flask app
-if __name__ == '__main__':
-    app.run(debug=True)
+# Default language
+LANGUAGE_CODE = 'en'
+
+# Locale path
+LOCALE_PATHS = [BASE_DIR / 'locale']

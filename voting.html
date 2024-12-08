@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Voting</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        #voteCount { font-size: 20px; }
+        button { margin: 5px; padding: 10px 20px; font-size: 16px; }
+    </style>
+</head>
+<body>
+
+    <h1>Real-Time Online Voting</h1>
+
+    <div id="voteCount">Loading vote count...</div>
+
+    <div>
+        <button id="partyA" onclick="vote('Party A')">Vote for Party A</button>
+        <button id="partyB" onclick="vote('Party B')">Vote for Party B</button>
+    </div>
+
+    <script>
+        // Connect to WebSocket server
+        const ws = new WebSocket('ws://localhost:8765');
+
+        // Update vote count when receiving a message from the server
+        ws.onmessage = function(event) {
+            const votes = JSON.parse(event.data);
+            document.getElementById('voteCount').innerText = `Party A: ${votes["Party A"]} | Party B: ${votes["Party B"]}`;
+        };
+
+        // Send a vote to the server
+        function vote(party) {
+            ws.send(party);
+        }
+
+        // Handle WebSocket connection open
+        ws.onopen = function() {
+            console.log('Connected to WebSocket server');
+        };
+
+        // Handle WebSocket connection close
+        ws.onclose = function() {
+            console.log('Disconnected from WebSocket server');
+        };
+    </script>
+
+</body>
+</html>
