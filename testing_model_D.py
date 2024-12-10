@@ -1,42 +1,64 @@
-# settings.py
+import ast
 
-INSTALLED_APPS = [
-    # ... other apps ...
-    'products',
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'django.contrib.sites',
-    # Localization and internationalization
-    'django.middleware.locale.LocaleMiddleware',
-]
+class LambdaSyntaxChecker(ast.NodeVisitor):
+    """
+    Custom visitor class to check for common syntax errors in lambda functions.
+    """
+    
+    def visit_Lambda(self, node):
+        """
+        Visit Lambda nodes and check for syntax errors.
+        """
+        # Check for missing parentheses around arguments
+        if not isinstance(node.args, ast.Lambda):
+            raise SyntaxError("Lambda function arguments must be enclosed in parentheses")
+        
+        # Check for incorrect argument syntax
+        if not isinstance(node.args.args, (ast.Name, ast.Tuple)):
+            raise SyntaxError("Lambda function arguments must be simple names or tuples")
+        
+        # Check for missing return statement (implicit return)
+        if not isinstance(node.body, ast.Expr):
+            raise SyntaxError("Lambda function body must be a single expression")
+        
+        # Visit the body of the lambda function
+        self.visit(node.body)
 
-MIDDLEWARE = [
-    # ... other middleware ...
-    'django.middleware.locale.LocaleMiddleware',
-    'django.middleware.common.CommonMiddleware',
-]
+def check_lambda_syntax(lambda_str):
+    """
+    Check the syntax of a lambda function string and raise a SyntaxError if any errors are found.
+    """
+    try:
+        # Parse the lambda function string into an AST
+        lambda_ast = ast.parse(lambda_str)
+        
+        # Create an instance of the LambdaSyntaxChecker class and visit the AST
+        checker = LambdaSyntaxChecker()
+        checker.visit(lambda_ast)
+        
+        # If no syntax errors were found, return True
+        return True
+    except SyntaxError as e:
+        # If a syntax error was found, print the error message and return False
+        print(f"Syntax error: {e}")
+        return False
 
-# Internationalization
-LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
-USE_I18N = True
-USE_L10N = True
-USE_TZ = True
+# Example usage
+lambda_str1 = "lambda x, y: x + y"
+lambda_str2 = "lambda x, y: x + y *"
+lambda_str3 = "lambda x, y: if x > y: x else: y"
 
-# Languages supported by the site
-LANGUAGES = [
-    ('en', 'English'),
-    ('es', 'Spanish'),
-    ('fr', 'French'),
-    ('de', 'German'),
-]
+if check_lambda_syntax(lambda_str1):
+    print("Lambda function syntax is correct!")
+else:
+    print("Lambda function syntax is incorrect.")
 
-# Default language
-LANGUAGE_CODE = 'en'
+if check_lambda_syntax(lambda_str2):
+    print("Lambda function syntax is correct!")
+else:
+    print("Lambda function syntax is incorrect.")
 
-# Locale path
-LOCALE_PATHS = [BASE_DIR / 'locale']
+if check_lambda_syntax(lambda_str3):
+    print("Lambda function syntax is correct!")
+else:
+    print("Lambda function syntax is incorrect.")
