@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="{{ g.get('locale', 'en') }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ _('Welcome to Our Website') }}</title>
+</head>
+<body>
+    <h1>{{ _('Welcome to Our Website') }}</h1>
+    <p>{{ _('This website is available in multiple languages.') }}</p>
+    
+    <p>{{ _('Select Language:') }}</p>
+    <ul>
+        <li><a href="/?lang=en">English</a></li>
+        <li><a href="/?lang=es">Español</a></li>
+        <li><a href="/?lang=fr">Français</a></li>
+        <li><a href="/?lang=zh">中文</a></li>
+    </ul>
+</body>
+</html>

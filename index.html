@@ -1,16 +1,109 @@
 <!DOCTYPE html>
-<html lang="{{ get_locale() }}">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>{{ _("E-commerce Platform") }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-commerce Website</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: {{ rhythm['spacing'] }}px;
+            background-color: #f5f5f5;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            margin: 0 0 {{ rhythm['spacing'] // 2 }}px;
+            color: #333;
+        }
+
+        p {
+            margin: 0 0 {{ rhythm['spacing'] }}px;
+        }
+
+        button {
+            padding: {{ rhythm['spacing'] // 2 }}px {{ rhythm['spacing'] }}px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: {{ rhythm['alignment'] }};
+        }
+
+        .product {
+            margin-bottom: {{ rhythm['spacing'] }};
+            padding: {{ rhythm['spacing'] }};
+            background-color: #fff;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .product-image {
+            max-width: 100%;
+            height: auto;
+            margin-bottom: {{ rhythm['spacing'] }};
+        }
+
+        .product-title {
+            margin-bottom: {{ rhythm['spacing'] // 2 }};
+        }
+
+        .product-price {
+            margin-bottom: {{ rhythm['spacing'] // 2 }};
+            font-weight: bold;
+        }
+
+        .product-description {
+            margin-bottom: {{ rhythm['spacing'] }};
+        }
+
+        .product-button {
+            display: block;
+            width: 100%;
+            text-align: center;
+        }
+    </style>
+    {% if css %}
+        <style>
+            {{ css }}
+        </style>
+    {% endif %}
 </head>
 <body>
-    <h1>{{ product_name }}</h1>
-    <p>{{ _("Price") }}: {{ format_currency(price) }}</p>
-    <p>{{ _("Today's Date") }}: {{ format_date(today) }}</p>
-    
-    <h2>{{ _("Choose Language") }}</h2>
-    <a href="{{ url_for('set_language', lang='en') }}">English</a> |
-    <a href="{{ url_for('set_language', lang='es') }}">Español</a>
+    <div class="container">
+        <h1>Welcome to Our E-commerce Website</h1>
+        <p>Browse our wide selection of products and enjoy a seamless shopping experience.</p>
+        <div class="product">
+            <img src="https://via.placeholder.com/300x300" alt="Product Image" class="product-image">
+            <h2 class="product-title">Product Title</h2>
+            <p class="product-price">$19.99</p>
+            <p class="product-description">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed euismod, nisi ac tincidunt cursus, ipsum nunc tincidunt velit, quis tincidunt nisl nunc quis nunc.</p>
+            <button class="product-button">Add to Cart</button>
+        </div>
+        <div class="product">
+            <img src="https://via.placeholder.com/300x300" alt="Product Image" class="product-image">
+            <h2 class="product-title">Product Title</h2>
+            <p class="product-price">$29.99</p>
+            <p class="product-description">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed euismod, nisi ac tincidunt cursus, ipsum nunc tincidunt velit, quis tincidunt nisl nunc quis nunc.</p>
+            <button class="product-button">Add to Cart</button>
+        </div>
+        <div class="product">
+            <img src="https://via.placeholder.com/300x300" alt="Product Image" class="product-image">
+            <h2 class="product-title">Product Title</h2>
+            <p class="product-price">$39.99</p>
+            <p class="product-description">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed euismod, nisi ac tincidunt cursus, ipsum nunc tincidunt velit, quis tincidunt nisl nunc quis nunc.</p>
+            <button class="product-button">Add to Cart</button>
+        </div>
+    </div>
 </body>
 </html>

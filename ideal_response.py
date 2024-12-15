@@ -1,52 +1,46 @@
-import ast
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
 
-def validate_lambda_syntax(lambda_expr):
-    """
-    Validates the syntax of a lambda function expression.
+# Example data (Year vs CO2 emissions)
+years = np.array([2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009])
+emissions = np.array([2.5, 2.6, 2.8, 3.0, 3.1, 3.1, 3.2, 3.5, 3.7, 3.9])
 
-    Parameters:
-    lambda_expr (str): The lambda function expression to validate.
+# Define piecewise linear function
+def piecewise_linear(x, x0, y0, k1, k2):
+    """Piecewise linear function with two segments."""
+    return np.piecewise(
+        x,
+        [x < x0, x >= x0],
+        [lambda x: k1 * x + y0 - k1 * x0, lambda x: k2 * x + y0 - k2 * x0]
+    )
 
-    Returns:
-    bool: True if the lambda function syntax is valid, False otherwise.
-    """
-    try:
-        # Attempt to parse the lambda function expression into an AST
-        lambda_ast = ast.parse(lambda_expr, mode='eval')
+# Initial guesses for parameters
+x0_guess = 2005  # Initial guess for the joinpoint (year)
+y0_guess = emissions[years == x0_guess][0]  # Emission at the joinpoint
+k1_guess = 0.1  # Slope before the joinpoint
+k2_guess = 0.2  # Slope after the joinpoint
 
-        # Check if the AST body is a Lambda function
-        if not isinstance(lambda_ast.body, ast.Lambda):
-            raise SyntaxError(f"Invalid syntax: '{lambda_expr}' is not a lambda function.")
+# Fit the piecewise function
+params, _ = curve_fit(piecewise_linear, years, emissions, p0=[x0_guess, y0_guess, k1_guess, k2_guess])
 
-        # Check if the lambda function has at least one argument
-        if len(lambda_ast.body.args.args) < 1:
-            raise SyntaxError("Lambda function must have at least one argument.")
+# Extract fitted parameters
+x0, y0, k1, k2 = params
 
-        # If the lambda expression is valid, return True
-        return True
+# Print joinpoint and slopes
+print(f"Joinpoint (Year): {x0:.2f}")
+print(f"Slope before joinpoint: {k1:.2f}")
+print(f"Slope after joinpoint: {k2:.2f}")
 
-    except SyntaxError as e:
-        print(f"Syntax error: {e}")
-        return False
-    except ValueError as e:
-        print(f"Value error: {e}. This might indicate a malformed expression.")
-        return False
-    except Exception as e:
-        print(f"Unexpected error: {e}")
-        return False
+# Generate data for the fitted curve
+fitted_emissions = piecewise_linear(years, *params)
 
-
-# Example usage
-lambda_exprs = [
-    "lambda x: x + 1",  # Valid
-    "lambda x, y: x + y",  # Valid
-    "lambda: 42",  # Invalid: Missing argument
-    "lambda x: x +",  # Invalid: Incomplete expression
-    "lambda x: if x > 0: x else: -x"  # Invalid: Syntax error with if-else
-]
-
-for lambda_expr in lambda_exprs:
-    if validate_lambda_syntax(lambda_expr):
-        print(f"'{lambda_expr}' is valid.")
-    else:
-        print(f"'{lambda_expr}' is invalid.")
+# Plot original data and the fitted curve
+plt.scatter(years, emissions, label="Original Data", color="blue")
+plt.plot(years, fitted_emissions, label="Fitted Joinpoint Regression", color="red")
+plt.axvline(x=x0, color="green", linestyle="--", label=f"Joinpoint at {x0:.2f}")
+plt.xlabel("Year")
+plt.ylabel("CO2 Emissions")
+plt.legend()
+plt.title("Joinpoint Regression Example")
+plt.show()
